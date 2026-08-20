@@ -40,7 +40,7 @@ cp .env.example .env.local   # optional - see below
 npm run dev
 ```
 
-Then open <http://localhost:3000>. Four sample texts are one click away.
+Then open <http://localhost:3000>. Five sample texts are one click away.
 
 `ANTHROPIC_API_KEY` is **optional**. Without it the app falls back to a local
 heuristic extractor (arrows, numbered steps, `A vs B` sections) so the pipeline
@@ -52,6 +52,21 @@ still runs end to end offline. With a key set, extraction goes through
 | `ANTHROPIC_API_KEY` | unset | Enables model-based extraction |
 | `NAPKIN_MODEL` | `claude-opus-5` | Model used for extraction |
 | `NAPKIN_EFFORT` | `medium` | `output_config.effort` for the extraction call |
+| `NAPKIN_RATE_LIMIT` | `20` | Extraction requests allowed per window, per client. `0` disables |
+| `NAPKIN_RATE_WINDOW` | `60` | Rate-limit window, in seconds |
+
+### Deploying this where other people can reach it
+
+`/api/extract` is the one route that spends money, so it is rate limited per
+client address — 20 requests a minute by default. Run locally it never fires.
+
+Read the limiter as a seatbelt, not a lock. State is per process, so serverless
+instances each keep their own counters and a cold start forgets everything, and
+the client address comes from a proxy header that only the hop directly in
+front of you can be trusted to set. **If you deploy this publicly with a key
+set, you are paying for whoever finds it.** Put it behind auth, or your own
+quota, or don't set a key on the public instance and let visitors use the
+heuristic extractor.
 
 ## Where things live
 
@@ -64,6 +79,7 @@ still runs end to end offline. With a key set, extraction goes through
 | 3. Render | `components/DiagramSvg.tsx`, `lib/theme.ts` |
 | 4. Editor | `lib/document.ts` (doc + history), `lib/layout/overrides.ts`, `components/Canvas.tsx` |
 | Export | `lib/export.ts` — SVG, PNG, clipboard |
+| Abuse control | `lib/ratelimit.ts` — per-client cap on the one route that spends money |
 
 `/fixtures` renders every layout from static specs in `lib/fixtures.ts`. Because
 rendering is deterministic, that page is the fastest way to see a layout
