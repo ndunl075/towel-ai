@@ -2,13 +2,35 @@
 
 Paste text, get a clean editable visual. One LLM call, deterministic rendering.
 
+[![CI](https://github.com/ndunl075/towel-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ndunl075/towel-ai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+![The app: pasted text on the left, a rendered comparison diagram on the right](docs/images/app.png)
+
 ```
 text ──▶ LLM (structure extraction) ──▶ JSON spec ──▶ layout engine ──▶ SVG ──▶ canvas
 ```
 
-The LLM never draws. It classifies the text and extracts its parts into a strict
-JSON spec; everything visible after that is deterministic TypeScript. See
-[`docs/architecture.md`](docs/architecture.md) for the design this is built from.
+**The LLM never draws.** It classifies the text and extracts its parts into a
+strict JSON spec; everything visible after that is deterministic TypeScript.
+That is the whole design decision — model-generated SVG is unreliable and
+impossible to restyle, so the model is kept to the one job it is good at. See
+[`docs/architecture.md`](docs/architecture.md).
+
+## Layouts
+
+Eight diagram types, each with a hand-written layout function. The model picks
+one; you can override it without spending a second call.
+
+| | |
+|---|---|
+| ![Flowchart](docs/images/layout-flowchart.png) | ![Cycle](docs/images/layout-cycle.png) |
+| ![Timeline](docs/images/layout-timeline.png) | ![Funnel](docs/images/layout-funnel.png) |
+
+![Venn](docs/images/layout-venn.png)
+
+Plus `hierarchy`, `comparison` and `list`. Four themes, applied at render time
+so the same spec draws four ways.
 
 ## Run it
 
@@ -97,3 +119,16 @@ npm run dev        # dev server
 npm run build      # production build
 npm run typecheck  # tsc --noEmit
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: the model never
+draws, layout code stays pure and deterministic, and `/fixtures` is the
+regression check.
+
+No API key is needed to develop against this — CI builds without one, on the
+same heuristic-extractor path a contributor without a key will hit.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
