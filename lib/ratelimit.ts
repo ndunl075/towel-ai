@@ -36,7 +36,13 @@ export interface RateLimitResult {
 }
 
 export interface RateLimiter {
-  check(key: string, now?: number): RateLimitResult;
+  /**
+   * `cost` is how many requests this call represents. One route fans a single
+   * user action out into several model calls, and charging it as one would let
+   * that action multiply straight past the limit. All-or-nothing: a call that
+   * cannot afford its full cost consumes nothing.
+   */
+  check(key: string, cost?: number, now?: number): RateLimitResult;
   /** Test seam. */
   reset(): void;
   readonly size: number;
@@ -57,22 +63,23 @@ export function createRateLimiter(config: RateLimitConfig): RateLimiter {
   }
 
   return {
-    check(key: string, now = Date.now()): RateLimitResult {
+    check(key: string, cost = 1, now = Date.now()): RateLimitResult {
       if (limit <= 0) return ALLOWED;
+      const charge = Math.max(1, Math.floor(cost));
 
       const cutoff = now - windowMs;
       const previous = hits.get(key);
       const recent = previous ? previous.filter((t) => t > cutoff) : [];
 
-      if (recent.length >= limit) {
+      if (recent.length + charge > limit) {
         // Map insertion order is oldest-key-first, and a blocked key is still
         // live, so re-set it to keep it from being the next one evicted.
         hits.set(key, recent);
         const retryAfter = Math.max(1, Math.ceil((recent[0] + windowMs - now) / 1000));
-        return { ok: false, limit, remaining: 0, retryAfter };
+        return { ok: false, limit, remaining: Math.max(0, limit - recent.length), retryAfter };
       }
 
-      recent.push(now);
+      for (let i = 0; i < charge; i++) recent.push(now);
       hits.set(key, recent);
 
       if (hits.size > maxKeys) {
@@ -103,6 +110,20 @@ function readInt(name: string, fallback: number): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+}
+
+/**
+ * One limiter for the whole process.
+ *
+ * Every route that can spend the deployer's quota has to charge the same
+ * budget. Give each route its own instance and a client simply alternates
+ * between them: two routes, two full allowances, and the cap means nothing.
+ */
+let shared: RateLimiter | null = null;
+
+export function sharedLimiter(): RateLimiter {
+  if (!shared) shared = createRateLimiter(configFromEnv());
+  return shared;
 }
 
 export function configFromEnv(): RateLimitConfig {

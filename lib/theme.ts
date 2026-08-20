@@ -1,3 +1,5 @@
+import type { FontMetric } from "./text";
+
 /**
  * Themes are applied at render time, never baked into the spec. Swapping a
  * theme re-renders the same layout with different paint.
@@ -49,6 +51,12 @@ export interface Theme {
   };
   font: {
     family: string;
+    /**
+     * Which advance-width profile `measureText` should use for this family.
+     * Layout is measured, not rendered, so the profile has to match the stack
+     * above or every box is sized for the wrong text.
+     */
+    metric: FontMetric;
     title: number;
     label: number;
     detail: number;
@@ -58,8 +66,18 @@ export interface Theme {
   };
 }
 
+/*
+ * System stacks only, deliberately. An exported SVG has to stand on its own
+ * with no network behind it, so a webfont would either need embedding or would
+ * silently fall back to something the layout was never measured against.
+ */
 const SANS =
   'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const MONO =
+  'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace';
+const SERIF = 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
+const CASUAL =
+  '"Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", ui-rounded, sans-serif';
 
 /**
  * v0 default. Warm paper ground, ink-dark type, five accents picked to hold
@@ -100,6 +118,7 @@ export const paperTheme: Theme = {
   },
   font: {
     family: SANS,
+    metric: "sans",
     title: 22,
     label: 15,
     detail: 12.5,
@@ -126,6 +145,9 @@ export const blueprintTheme: Theme = {
   ],
   node: { ...paperTheme.node, radius: 4, strokeWidth: 1.5, shadow: null },
   edge: { ...paperTheme.edge, stroke: "#8C9AAA", width: 1.5, labelBackground: "#F4F6F9" },
+  // Monospace sets wider than the sans at the same nominal size, so the sizes
+  // come down a little to keep a label on one line as often as it was before.
+  font: { ...paperTheme.font, family: MONO, metric: "mono", label: 13.5, detail: 11.5, title: 20 },
   group: {
     stroke: "#CFD8E3",
     fill: "#EAEFF5",
@@ -152,6 +174,7 @@ export const midnightTheme: Theme = {
   ],
   node: { ...paperTheme.node, radius: 12, strokeWidth: 1.5, shadow: null },
   edge: { ...paperTheme.edge, stroke: "#5B6270", width: 1.75, labelBackground: "#14161B" },
+  font: { ...paperTheme.font, family: SERIF, metric: "serif" },
   group: {
     stroke: "#2E333D",
     fill: "#1B1E25",
@@ -178,6 +201,7 @@ export const markerTheme: Theme = {
   ],
   node: { radius: 14, strokeWidth: 2.5, paddingX: 20, paddingY: 15, shadow: null },
   edge: { stroke: "#1F2937", width: 2.5, arrow: 10, labelBackground: "#FFFDF8" },
+  font: { ...paperTheme.font, family: CASUAL, metric: "round" },
   group: {
     stroke: "#1F2937",
     fill: "#FFF8E6",

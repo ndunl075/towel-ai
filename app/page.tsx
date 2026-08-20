@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
 import { IconPicker } from "@/components/IconPicker";
+import { DiagramSvg } from "@/components/DiagramSvg";
 import { SuggestionGrid } from "@/components/SuggestionGrid";
 import {
   addNode,
+  adoptSpec,
   canRedo,
   canUndo,
   commit,
@@ -38,6 +40,18 @@ import { autoIconFor } from "@/lib/icons";
 import { type DiagramNode, type DiagramSpec, type DiagramType } from "@/lib/spec";
 import { getTheme, THEMES } from "@/lib/theme";
 import styles from "./page.module.css";
+
+interface SpecVariant {
+  type: DiagramType;
+  spec: DiagramSpec;
+  source: "model" | "heuristic";
+  provider: string | null;
+}
+
+interface SuggestResponse {
+  variants: SpecVariant[];
+  error?: string;
+}
 
 interface ExtractResponse {
   spec: DiagramSpec;
@@ -76,6 +90,9 @@ export default function Home() {
   const [zoom, setZoom] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [lastThemeId, setLastThemeId] = useState(THEMES[0].id);
+  /** Re-extracted alternatives, per section. Cleared whenever the spec changes. */
+  const [variants, setVariants] = useState<Record<string, SpecVariant[]>>({});
+  const [variantsBusy, setVariantsBusy] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => splitSections(text), [text]);
@@ -114,6 +131,38 @@ export default function Home() {
   );
 
   const selectedNode = doc?.spec.nodes.find((n) => n.id === selected) ?? null;
+  const activeVariants = active ? (variants[active.id] ?? []) : [];
+
+  /**
+   * v2's parallel extraction. The free ranking picks which type hints are worth
+   * paying for, so the deterministic work decides where the expensive work
+   * goes - rather than firing a call at all eight types.
+   */
+  const buildVariants = useCallback(async () => {
+    if (!active || !doc) return;
+    const types = suggestions
+      .filter((s) => s.fits && s.type !== doc.spec.type)
+      .slice(0, 3)
+      .map((s) => s.type);
+    if (types.length === 0) return;
+
+    setVariantsBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: active.text, types }),
+      });
+      const data = (await response.json()) as SuggestResponse;
+      if (!response.ok) throw new Error(data.error ?? "Could not build alternatives");
+      setVariants((current) => ({ ...current, [active.id]: data.variants }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setVariantsBusy(false);
+    }
+  }, [active, doc, suggestions]);
 
   const select = useCallback((id: string) => {
     setPinned(id);
@@ -192,6 +241,12 @@ export default function Home() {
           ...current,
           [sectionId]: data.note ?? extractedWith(data),
         }));
+        setVariants((current) => {
+          if (!(sectionId in current)) return current;
+          const next = { ...current };
+          delete next[sectionId];
+          return next;
+        });
         setPreview(null);
         setSelected(null);
       } catch (err) {
@@ -389,6 +444,39 @@ export default function Home() {
             </section>
 
             <section className={styles.section}>
+              <h2>Alternatives</h2>
+              <p className={styles.hint}>
+                The tiles above rearrange the nodes the model already chose. These read the
+                text again for each shape, in parallel, so a comparison gets columns of
+                attributes rather than a chain of steps re-stacked.
+              </p>
+              <button type="button" disabled={loading || variantsBusy} onClick={buildVariants}>
+                {variantsBusy ? "Extracting 3 in parallel..." : "Re-extract 3 alternatives"}
+              </button>
+              <p className={styles.hint}>
+                Three model calls, one per shape, chosen by the ranking above.
+              </p>
+
+              {activeVariants.length > 0 && (
+                <div className={styles.variants}>
+                  {activeVariants.map((variant) => (
+                    <VariantTile
+                      key={variant.type}
+                      variant={variant}
+                      theme={theme}
+                      label={TYPE_LABELS[variant.type]}
+                      active={
+                        doc.spec.type === variant.type &&
+                        doc.spec.nodes.length === variant.spec.nodes.length
+                      }
+                      onAdopt={() => apply((current) => adoptSpec(current, variant.spec))}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className={styles.section}>
               <h2>Theme</h2>
               <div className={styles.themes}>
                 {THEMES.map((option) => (
@@ -554,6 +642,48 @@ export default function Home() {
         {toast && <div className={styles.toast}>{toast}</div>}
       </section>
     </main>
+  );
+}
+
+/**
+ * One re-extracted alternative, drawn from its own spec so the preview is the
+ * diagram you would actually get rather than a restyling of the current one.
+ */
+function VariantTile({
+  variant,
+  theme,
+  label,
+  active,
+  onAdopt,
+}: {
+  variant: SpecVariant;
+  theme: ReturnType<typeof getTheme>;
+  label: string;
+  active: boolean;
+  onAdopt: () => void;
+}) {
+  const layout = useMemo(
+    () => layoutSpec(variant.spec, theme, (node) => autoIconFor(node.label, node.detail)),
+    [variant.spec, theme],
+  );
+  return (
+    <button
+      type="button"
+      className={`${styles.variant} ${active ? styles.variantActive : ""}`}
+      onClick={onAdopt}
+      title={`${label} - ${variant.spec.nodes.length} nodes, re-extracted`}
+    >
+      <span className={styles.variantPreview} style={{ background: theme.background }} aria-hidden>
+        <DiagramSvg layout={layout} theme={theme} idPrefix={`variant-${variant.type}`} />
+      </span>
+      <span className={styles.variantMeta}>
+        <span className={styles.variantName}>{label}</span>
+        <span className={styles.variantSub}>
+          {variant.spec.nodes.length} nodes
+          {variant.source === "heuristic" ? " · heuristic" : ""}
+        </span>
+      </span>
+    </button>
   );
 }
 

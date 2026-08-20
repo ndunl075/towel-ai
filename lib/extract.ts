@@ -138,6 +138,49 @@ export async function extractSpec(text: string, typeHint?: DiagramType): Promise
   };
 }
 
+export interface SpecVariant {
+  type: DiagramType;
+  spec: DiagramSpec;
+  source: ExtractSource;
+  provider: ProviderId | null;
+}
+
+/**
+ * v2's multiple visual suggestions: the same text extracted several times over,
+ * in parallel, each run pinned to a different type.
+ *
+ * This is a different thing from re-laying out one spec under another layout.
+ * Re-layout can only rearrange the nodes the model already chose; a comparison
+ * of the same text wants *different nodes* from a flowchart of it - columns of
+ * attributes rather than a chain of steps. Only a second extraction produces
+ * that, which is why it costs a call per variant and is never automatic.
+ */
+export async function extractVariants(
+  text: string,
+  types: DiagramType[],
+): Promise<SpecVariant[]> {
+  const wanted = types.filter((t, i) => DIAGRAM_TYPES.includes(t) && types.indexOf(t) === i);
+  if (wanted.length === 0) return [];
+
+  const settled = await Promise.allSettled(wanted.map((type) => extractSpec(text, type)));
+
+  const variants: SpecVariant[] = [];
+  settled.forEach((outcome, i) => {
+    // One variant failing is not the request failing - show the ones that
+    // worked rather than throwing the whole set away.
+    if (outcome.status !== "fulfilled") return;
+    const result = outcome.value;
+    if (result.spec.nodes.length === 0) return;
+    variants.push({
+      type: wanted[i],
+      spec: result.spec,
+      source: result.source,
+      provider: result.provider,
+    });
+  });
+  return variants;
+}
+
 function noProviderNote(): string {
   const requested = (process.env.NAPKIN_PROVIDER ?? "auto").toLowerCase();
   if (requested === "anthropic") {

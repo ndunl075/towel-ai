@@ -51,9 +51,13 @@ export function sizeNode(node: DiagramNode, theme: Theme, opts: SizeOptions = {}
   const label = wrapText(node.label, content, theme.font.label, theme.font.lineHeight, {
     bold: true,
     maxLines: opts.maxLabelLines ?? 3,
+    metric: theme.font.metric,
   });
   const detail = node.detail
-    ? wrapText(node.detail, content, theme.font.detail, theme.font.lineHeight, { maxLines: 2 })
+    ? wrapText(node.detail, content, theme.font.detail, theme.font.lineHeight, {
+        maxLines: 2,
+        metric: theme.font.metric,
+      })
     : null;
 
   const textWidth = Math.max(label.width, detail?.width ?? 0);
@@ -141,7 +145,7 @@ export function finalize(
   const shiftedCaptions = captions.map((c) => ({ ...c, x: c.x + dx, y: c.y + dy }));
 
   const contentWidth = maxX - minX;
-  const titleWidth = title ? measureText(title, theme.font.title, true) : 0;
+  const titleWidth = title ? measureText(title, theme.font.title, true, theme.font.metric) : 0;
 
   return {
     width: Math.ceil(Math.max(contentWidth, titleWidth) + PAGE_PADDING * 2),
@@ -160,7 +164,9 @@ export function finalize(
 /** Approximate, but it only has to stop a caption being cropped at the edge. */
 function captionBounds(caption: Caption, theme: Theme): Rect {
   const size = caption.size === "label" ? theme.font.label : theme.font.detail;
-  const width = measureText(caption.text, size, caption.weight >= 600) * (caption.uppercase ? 1.12 : 1);
+  const width =
+    measureText(caption.text, size, caption.weight >= 600, theme.font.metric) *
+    (caption.uppercase ? 1.12 : 1);
   const x =
     caption.anchor === "middle"
       ? caption.x - width / 2

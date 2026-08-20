@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { extractSpec } from "@/lib/extract";
-import { clientKey, configFromEnv, createRateLimiter } from "@/lib/ratelimit";
+import { clientKey, sharedLimiter } from "@/lib/ratelimit";
 import { DIAGRAM_TYPES, type DiagramType } from "@/lib/spec";
 
 export const runtime = "nodejs";
@@ -11,15 +11,14 @@ export const dynamic = "force-dynamic";
 const MAX_CHARS = 8000;
 
 /**
- * Module scope, so the counters live as long as the server process does. This
- * is the only route that can spend the deployer's Anthropic quota, and the
- * repo is public - see lib/ratelimit.ts for what this does and does not cover.
+ * Shared with every other route that spends the deployer's quota, so the cap
+ * bounds total spend rather than spend per endpoint.
  */
-const limiter = createRateLimiter(configFromEnv());
+const limiter = sharedLimiter();
 
 export async function POST(request: Request) {
   // Checked before parsing the body: a rejected caller should cost us nothing.
-  const rate = limiter.check(clientKey(request));
+  const rate = limiter.check(clientKey(request), 1);
   if (!rate.ok) {
     return NextResponse.json(
       { error: `Too many requests - try again in ${rate.retryAfter}s` },
