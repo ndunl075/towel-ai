@@ -8,6 +8,7 @@ import {
   type Caption,
   type Decoration,
   type Layout,
+  type LayoutContext,
   type RenderNode,
 } from "./types";
 
@@ -26,7 +27,12 @@ export interface SizeOptions {
   maxLabelLines?: number;
   paddingX?: number;
   paddingY?: number;
+  /** Reserve the lead slot for an icon, the way a badge occupies one. */
+  icon?: boolean;
 }
+
+/** Width of the lead slot an icon or a badge sits in. */
+export const LEAD_INSET = 30;
 
 /**
  * A node box is sized to its own text, clamped into a band so a diagram of
@@ -37,7 +43,10 @@ export function sizeNode(node: DiagramNode, theme: Theme, opts: SizeOptions = {}
   const padY = opts.paddingY ?? theme.node.paddingY;
   const minWidth = opts.minWidth ?? 132;
   const maxWidth = opts.maxWidth ?? 236;
-  const content = opts.fixedWidth ? opts.fixedWidth - padX * 2 : maxWidth - padX * 2;
+  // The icon eats into the text column, so wrapping has to know about it too -
+  // otherwise a fixed-width card overflows instead of wrapping a line earlier.
+  const lead = opts.icon ? LEAD_INSET : 0;
+  const content = (opts.fixedWidth ? opts.fixedWidth : maxWidth) - padX * 2 - lead;
 
   const label = wrapText(node.label, content, theme.font.label, theme.font.lineHeight, {
     bold: true,
@@ -48,7 +57,7 @@ export function sizeNode(node: DiagramNode, theme: Theme, opts: SizeOptions = {}
     : null;
 
   const textWidth = Math.max(label.width, detail?.width ?? 0);
-  const w = opts.fixedWidth ?? clamp(Math.ceil(textWidth + padX * 2), minWidth, maxWidth);
+  const w = opts.fixedWidth ?? clamp(Math.ceil(textWidth + padX * 2 + lead), minWidth, maxWidth);
   const h =
     Math.ceil(label.height + (detail ? detail.height + 4 : 0) + padY * 2);
 
@@ -58,6 +67,14 @@ export function sizeNode(node: DiagramNode, theme: Theme, opts: SizeOptions = {}
     w,
     h: Math.max(h, 48),
   };
+}
+
+/**
+ * Icons are opt-in per document, so a layout must ask rather than assume. This
+ * is the one place that decides what "no icons" means: null everywhere.
+ */
+export function iconResolver(ctx: LayoutContext): (node: DiagramNode) => string | null {
+  return (node) => ctx.iconFor?.(node) ?? null;
 }
 
 export function clamp(n: number, lo: number, hi: number): number {
@@ -175,6 +192,7 @@ export function emptyNode(id: string): RenderNode {
     labelLines: [],
     detailLines: [],
     badge: null,
+    icon: null,
     align: "center",
   };
 }

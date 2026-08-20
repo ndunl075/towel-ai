@@ -1,4 +1,4 @@
-import { finalize, sizeNode } from "./measure";
+import { finalize, iconResolver, sizeNode } from "./measure";
 import type { Caption, Decoration, Layout, LayoutContext, RenderNode } from "./types";
 
 const CARD_WIDTH = 190;
@@ -17,8 +17,9 @@ export function layoutTimeline(ctx: LayoutContext): Layout {
   const count = spec.nodes.length;
   if (count === 0) return finalize({ title: spec.title, nodes: [], edges: [], groups: [] }, theme);
 
+  const iconOf = iconResolver(ctx);
   const sized = spec.nodes.map((n) =>
-    sizeNode(n, theme, { fixedWidth: CARD_WIDTH, maxLabelLines: 3 }),
+    sizeNode(n, theme, { fixedWidth: CARD_WIDTH, maxLabelLines: 3, icon: Boolean(iconOf(n)) }),
   );
   const tallest = Math.max(...sized.map((s) => s.h));
   const step = CARD_WIDTH + COLUMN_GAP;
@@ -47,6 +48,7 @@ export function layoutTimeline(ctx: LayoutContext): Layout {
       labelLines: size.labelLines,
       detailLines: size.detailLines,
       badge: null,
+      icon: iconOf(node),
       align: "center",
     });
 

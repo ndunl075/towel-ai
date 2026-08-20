@@ -61,6 +61,9 @@ export function layoutFunnel(ctx: LayoutContext): Layout {
       labelLines: label.lines,
       detailLines: detail?.lines ?? [],
       badge: null,
+      // A trapezoid band is centred text on a shape that changes width per row;
+      // a lead slot would sit over the taper. Funnels carry no icons.
+      icon: null,
       align: "center",
     });
 
@@ -108,6 +111,7 @@ function singleBand(ctx: LayoutContext): Layout {
           labelLines: label.lines,
           detailLines: [],
           badge: null,
+          icon: null,
           align: "center",
         },
       ],

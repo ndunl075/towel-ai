@@ -1,5 +1,6 @@
 import { DiagramSvg } from "@/components/DiagramSvg";
 import { FIXTURES } from "@/lib/fixtures";
+import { autoIconFor } from "@/lib/icons";
 import { layoutSpec } from "@/lib/layout";
 import { paperTheme } from "@/lib/theme";
 
@@ -17,11 +18,15 @@ export default function Fixtures() {
         <h1 style={{ margin: 0, fontSize: 20, letterSpacing: "-0.02em" }}>Renderer fixtures</h1>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--muted)" }}>
           Static specs through the real layout engine and renderer. No model call.
+          Icons are auto-matched, as they are by default in the editor, so this page
+          catches icon sizing regressions too.
         </p>
       </header>
 
       {FIXTURES.map((fixture) => {
-        const layout = layoutSpec(fixture.spec, paperTheme);
+        const layout = layoutSpec(fixture.spec, paperTheme, (node) =>
+          autoIconFor(node.label, node.detail),
+        );
         return (
           <section key={fixture.name} style={{ display: "grid", gap: 8 }}>
             <h2

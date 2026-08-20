@@ -100,6 +100,9 @@ export function layoutVenn(ctx: LayoutContext): Layout {
         labelLines: size.labelLines,
         detailLines: size.detailLines,
         badge: null,
+        // Venn pills are packed to fit inside a lobe; widening them for a lead
+        // slot pushes members out through the circle. No icons here either.
+        icon: null,
         align: "center",
       });
       y += size.h + gap;

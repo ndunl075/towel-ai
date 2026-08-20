@@ -1,5 +1,5 @@
 import { layoutSpec, type Layout } from "./layout";
-import { IMPLEMENTED_TYPES, type DiagramSpec, type DiagramType } from "./spec";
+import { IMPLEMENTED_TYPES, type DiagramNode, type DiagramSpec, type DiagramType } from "./spec";
 import type { Theme } from "./theme";
 
 /**
@@ -79,11 +79,16 @@ const TIME = new RegExp(
   "i",
 );
 
-export function suggestTypes(spec: DiagramSpec, theme: Theme): Suggestion[] {
+export function suggestTypes(
+  spec: DiagramSpec,
+  theme: Theme,
+  /** Passed straight through, so a tile previews what the canvas would draw. */
+  iconFor?: (node: DiagramNode) => string | null,
+): Suggestion[] {
   const shape = describe(spec);
 
   const suggestions = IMPLEMENTED_TYPES.map((type) => {
-    const layout = layoutSpec({ ...spec, type }, theme);
+    const layout = layoutSpec({ ...spec, type }, theme, iconFor);
     const { score, reason } = rate(type, shape);
     // A degraded layout is not this type at all, so it never outranks one that
     // genuinely fits, whatever the structural score said.

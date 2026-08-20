@@ -1,5 +1,6 @@
 import type { Layout, RenderEdge, RenderGroup, RenderNode } from "@/lib/layout";
 import type { Caption, Decoration } from "@/lib/layout/types";
+import { getIcon, ICON_VIEWBOX, type Icon } from "@/lib/icons";
 import { accentFor, type Theme } from "@/lib/theme";
 import { measureText } from "@/lib/text";
 
@@ -312,9 +313,12 @@ function Node({
   const radius =
     node.shape === "pill" ? Math.min(node.h / 2, 16) : theme.node.radius;
 
-  const badgeInset = node.badge ? 30 : 0;
-  const textLeft = node.x + theme.node.paddingX + badgeInset;
-  const centerX = node.x + node.w / 2 + badgeInset / 2;
+  // An icon and a step number both want the lead slot; the icon says more, so
+  // it wins and the number is dropped rather than crowded in beside it.
+  const icon = getIcon(node.icon);
+  const leadInset = icon || node.badge ? 30 : 0;
+  const textLeft = node.x + theme.node.paddingX + leadInset;
+  const centerX = node.x + node.w / 2 + leadInset / 2;
 
   const labelHeight = node.labelLines.length * theme.font.label * theme.font.lineHeight;
   const detailHeight = node.detailLines.length
@@ -365,7 +369,16 @@ function Node({
         />
       )}
 
-      {node.badge && (
+      {icon && (
+        <NodeIcon
+          icon={icon}
+          cx={node.x + 26}
+          cy={node.y + node.h / 2}
+          color={isHeader ? "#FFFFFF" : accent.stroke}
+        />
+      )}
+
+      {!icon && node.badge && (
         <>
           <circle
             cx={node.x + 26}
@@ -425,6 +438,57 @@ function Node({
           >
             {line}
           </text>
+        );
+      })}
+    </g>
+  );
+}
+
+/**
+ * One icon from the library, scaled from its 24-unit grid into the node's lead
+ * slot. Stroked rather than filled so it takes the accent colour and reads on
+ * any of the theme backgrounds.
+ */
+function NodeIcon({
+  icon,
+  cx,
+  cy,
+  color,
+  size = 19,
+}: {
+  icon: Icon;
+  cx: number;
+  cy: number;
+  color: string;
+  size?: number;
+}) {
+  const scale = size / ICON_VIEWBOX;
+  return (
+    <g
+      transform={`translate(${cx - size / 2} ${cy - size / 2}) scale(${scale})`}
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8 / scale}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {icon.shapes.map((shape, i) => {
+        if (shape.k === "path") return <path key={i} d={shape.d} />;
+        if (shape.k === "circle") {
+          return <circle key={i} cx={shape.cx} cy={shape.cy} r={shape.r} />;
+        }
+        if (shape.k === "line") {
+          return <line key={i} x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />;
+        }
+        return (
+          <rect
+            key={i}
+            x={shape.x}
+            y={shape.y}
+            width={shape.w}
+            height={shape.h}
+            rx={shape.r ?? 1.5}
+          />
         );
       })}
     </g>

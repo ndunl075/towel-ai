@@ -78,6 +78,7 @@ heuristic extractor.
 | 2. Layout | `lib/layout/` — `graph.ts` (dagre), `cycle.ts`, `comparison.ts`, `timeline.ts`, `funnel.ts`, `venn.ts`, `list.ts` |
 | 3. Render | `components/DiagramSvg.tsx`, `lib/theme.ts` |
 | Suggestions | `lib/suggestions.ts` — ranks every type, `components/SuggestionGrid.tsx` draws them |
+| Icons | `lib/icons.ts` — the library and the matcher, `components/IconPicker.tsx` browses it |
 | 4. Editor | `lib/document.ts` (doc + history), `lib/layout/overrides.ts`, `components/Canvas.tsx` |
 | Export | `lib/export.ts` — SVG, PNG, clipboard |
 | Abuse control | `lib/ratelimit.ts` — per-client cap on the one route that spends money |
@@ -140,13 +141,31 @@ Section ids are a hash of the section's own text, so editing section three
 changes only section three's id. Sections one and two keep the diagrams already
 generated for them, and undoing the edit brings section three's back from cache.
 
+**Icons.** 38 icons, matched against the words already in the spec, on by
+default and switchable off. Same rule as everything else downstream of
+extraction: the model never draws. The set is local and inline, so an exported
+SVG still stands on its own with nothing behind it, and every icon is stroked on
+one 24-unit grid so it takes the accent colour and reads on all four themes.
+
+An icon takes the same lead slot a list's step number uses, and wins it — the
+icon says more than the number. Node sizing reserves that slot, so a label wraps
+a line earlier rather than running under the glyph. Funnel bands and venn pills
+carry no icons: a band changes width per row so the slot would sit over the
+taper, and venn pills are packed to fit inside a lobe, so widening them pushes
+members out through the circle.
+
+Matching is longest-keyword-first on whole words, so `billing` beats `team` and
+`process` never matches inside `processor`. When it guesses wrong, select the
+node and pick from the library; **No icon** clears it and **Auto** hands it back
+to the matcher. Those are different states, and the document keeps them apart —
+otherwise clearing an icon would just re-match it on the next render.
+
 **Venn convention.** The spec gives a node one group, so overlap membership
 needs a rule: a node carrying a `group` sits in that set's exclusive lobe, and
 a node with `group: null` is shared by every set and sits in the middle. The
 extraction prompt states the same rule.
 
-That closes v1, and v2's multiple-suggestions item. Not built yet: the icon
-library (v2).
+That closes v0, v1 and v2.
 
 ## How extraction fails safely
 

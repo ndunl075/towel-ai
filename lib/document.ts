@@ -1,4 +1,5 @@
-import { makeId, normalizeSpec, type DiagramSpec, type DiagramType } from "./spec";
+import { autoIconFor } from "./icons";
+import { makeId, normalizeSpec, type DiagramNode, type DiagramSpec, type DiagramType } from "./spec";
 
 /**
  * What the editor actually edits.
@@ -17,6 +18,14 @@ export interface DiagramDoc {
    */
   offsets: Record<string, Offset>;
   themeId: string;
+  /** Icons off means the diagram draws exactly as it did before the library. */
+  showIcons: boolean;
+  /**
+   * Per-node icon decisions. An id that is *absent* uses whatever the matcher
+   * picks; an id mapped to null was explicitly cleared by the user. The two
+   * have to stay distinguishable, or clearing an icon would just re-match it.
+   */
+  icons: Record<string, string | null>;
 }
 
 export interface Offset {
@@ -33,7 +42,31 @@ export interface History {
 const HISTORY_LIMIT = 60;
 
 export function newDoc(spec: DiagramSpec, themeId: string): DiagramDoc {
-  return { spec: normalizeSpec(spec), offsets: {}, themeId };
+  return { spec: normalizeSpec(spec), offsets: {}, themeId, showIcons: true, icons: {} };
+}
+
+/** The icon a node ends up with: the user's choice, else the match, else none. */
+export function iconForNode(doc: DiagramDoc, node: DiagramNode): string | null {
+  if (!doc.showIcons) return null;
+  if (Object.prototype.hasOwnProperty.call(doc.icons, node.id)) return doc.icons[node.id];
+  return autoIconFor(node.label, node.detail);
+}
+
+export function setIcon(doc: DiagramDoc, id: string, icon: string | null): DiagramDoc {
+  return { ...doc, icons: { ...doc.icons, [id]: icon } };
+}
+
+/** Hands the node back to the matcher, which is not the same as clearing it. */
+export function resetIcon(doc: DiagramDoc, id: string): DiagramDoc {
+  if (!Object.prototype.hasOwnProperty.call(doc.icons, id)) return doc;
+  const icons = { ...doc.icons };
+  delete icons[id];
+  return { ...doc, icons };
+}
+
+export function setShowIcons(doc: DiagramDoc, showIcons: boolean): DiagramDoc {
+  if (doc.showIcons === showIcons) return doc;
+  return { ...doc, showIcons };
 }
 
 export function newHistory(doc: DiagramDoc): History {
@@ -127,9 +160,12 @@ export function deleteNode(doc: DiagramDoc, id: string): DiagramDoc {
   if (!doc.spec.nodes.some((n) => n.id === id)) return doc;
   const offsets = { ...doc.offsets };
   delete offsets[id];
+  const icons = { ...doc.icons };
+  delete icons[id];
   return {
     ...doc,
     offsets,
+    icons,
     spec: normalizeSpec({
       ...doc.spec,
       nodes: doc.spec.nodes.filter((n) => n.id !== id),
