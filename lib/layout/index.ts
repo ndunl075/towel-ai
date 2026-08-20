@@ -7,7 +7,7 @@ import { layoutGraph } from "./graph";
 import { layoutList } from "./list";
 import { layoutTimeline } from "./timeline";
 import { layoutVenn } from "./venn";
-import type { Layout, LayoutContext } from "./types";
+import type { Layout, LayoutContext, LayoutFn } from "./types";
 
 export type { Layout, RenderEdge, RenderGroup, RenderNode } from "./types";
 
@@ -16,7 +16,7 @@ export type { Layout, RenderEdge, RenderGroup, RenderNode } from "./types";
  * partial so a type added to the spec before its layout exists degrades to a
  * list rather than rendering nothing.
  */
-const LAYOUTS: Partial<Record<DiagramType, (ctx: LayoutContext) => Layout>> = {
+const LAYOUTS: Partial<Record<DiagramType, LayoutFn>> = {
   flowchart: (ctx) => layoutGraph(ctx, { rankdir: "LR" }),
   hierarchy: (ctx) => layoutGraph(ctx, { rankdir: "TB", ranksep: 56 }),
   cycle: layoutCycle,
