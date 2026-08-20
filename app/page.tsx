@@ -6,6 +6,7 @@ import { Canvas } from "@/components/Canvas";
 import { IconPicker } from "@/components/IconPicker";
 import { DiagramSvg } from "@/components/DiagramSvg";
 import { SuggestionGrid } from "@/components/SuggestionGrid";
+import { TextField } from "@/components/TextField";
 import {
   addNode,
   adoptSpec,
@@ -20,9 +21,11 @@ import {
   redo,
   resetIcon,
   resetPositions,
+  setDetail,
   setIcon,
   setLabel,
   setShowIcons,
+  setTitle,
   setTheme,
   setType,
   undo,
@@ -504,6 +507,59 @@ export default function Home() {
             </section>
 
             <section className={styles.section}>
+              <h2>Title</h2>
+              <TextField
+                label=""
+                value={doc.spec.title ?? ""}
+                placeholder="Untitled diagram"
+                inputClassName={styles.field}
+                onCommit={(next) => apply((current) => setTitle(current, next))}
+              />
+              <p className={styles.hint}>Drawn above the diagram, and used as the export filename.</p>
+            </section>
+
+            <section className={styles.section}>
+              <h2>Selected node</h2>
+              {selectedNode ? (
+                <>
+                  <TextField
+                    key={`label-${selectedNode.id}`}
+                    label="Label"
+                    value={selectedNode.label}
+                    required
+                    className={styles.fieldLabel}
+                    inputClassName={styles.field}
+                    onCommit={(next) => apply((current) => setLabel(current, selectedNode.id, next))}
+                  />
+                  <TextField
+                    key={`detail-${selectedNode.id}`}
+                    label="Detail"
+                    value={selectedNode.detail ?? ""}
+                    placeholder="Optional second line"
+                    className={styles.fieldLabel}
+                    inputClassName={styles.field}
+                    onCommit={(next) => apply((current) => setDetail(current, selectedNode.id, next))}
+                  />
+                  {doc.showIcons && (
+                    <IconPicker
+                      value={iconForNode(doc, selectedNode)}
+                      auto={
+                        !Object.prototype.hasOwnProperty.call(doc.icons, selectedNode.id) &&
+                        autoIconFor(selectedNode.label, selectedNode.detail) !== null
+                      }
+                      onPick={(id) => apply((current) => setIcon(current, selectedNode.id, id))}
+                      onReset={() => apply((current) => resetIcon(current, selectedNode.id))}
+                    />
+                  )}
+                </>
+              ) : (
+                <p className={styles.hint}>
+                  Click a node to edit its label, its detail line and its icon.
+                </p>
+              )}
+            </section>
+
+            <section className={styles.section}>
               <h2>Icons</h2>
               <label className={styles.toggle}>
                 <input
@@ -516,23 +572,9 @@ export default function Home() {
                 />
                 <span>Match icons from the text</span>
               </label>
-              {doc.showIcons &&
-                (selectedNode ? (
-                  <IconPicker
-                    value={iconForNode(doc, selectedNode)}
-                    auto={
-                      !Object.prototype.hasOwnProperty.call(doc.icons, selectedNode.id) &&
-                      autoIconFor(selectedNode.label, selectedNode.detail) !== null
-                    }
-                    onPick={(id) => apply((current) => setIcon(current, selectedNode.id, id))}
-                    onReset={() => apply((current) => resetIcon(current, selectedNode.id))}
-                  />
-                ) : (
-                  <p className={styles.hint}>
-                    Select a node to change its icon. Funnels and venns carry none - a
-                    lead slot would sit over the shape.
-                  </p>
-                ))}
+              <p className={styles.hint}>
+                Funnels and venns carry none - a lead slot would sit over the shape.
+              </p>
             </section>
 
             <section className={styles.section}>

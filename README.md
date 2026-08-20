@@ -140,7 +140,15 @@ is the fastest way to catch that. The canvas is editable, and export covers PNG,
 SVG and clipboard.
 
 **Editing.** Drag a node to move it, double-click to rename it, Backspace to
-delete it, plus Add node and Reset layout. Cmd/Ctrl+Z undoes anything, theme
+delete it, plus Add node and Reset layout. Selecting a node opens its label,
+its detail line and its icon in the sidebar, and the diagram title is editable
+there too — every text field the spec carries is reachable.
+
+Those fields commit on blur or Enter, not on every keystroke. Undo is a stack of
+whole documents, so per-keystroke commits would make a ten-character rename ten
+undo steps; and the document refuses an empty label, so a plain controlled input
+would reject the intermediate empty state and you could never clear a field to
+retype it. Cmd/Ctrl+Z undoes anything, theme
 switches and type switches included, because the whole editor state is one
 `DiagramDoc` and history is a stack of those.
 
@@ -227,7 +235,9 @@ That closes v0, v1 and v2.
    re-asking cannot fix — an unreachable Ollama, a 4xx — skips the retry and
    falls back immediately, so a server that is not running costs a fraction of a
    second rather than two timeouts.
-3. Heuristic finds no structure → a styled list.
+3. The heuristic throws, or finds nothing at all → `listSpecFromText`, which
+   splits the text into sentences and styles them. Three layers deep, and the
+   last one cannot fail: whatever happens, something renders.
 
 `normalizeSpec` also repairs specs that are schema-valid but incoherent: edges
 pointing at nodes that were never declared, duplicate ids, self-loops, nodes
