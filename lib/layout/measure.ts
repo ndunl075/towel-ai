@@ -184,21 +184,3 @@ function decorationBounds(d: Decoration): Rect {
   const y = Math.min(d.y1, d.y2);
   return { x, y, w: Math.abs(d.x2 - d.x1), h: Math.abs(d.y2 - d.y1) };
 }
-
-export function emptyNode(id: string): RenderNode {
-  return {
-    id,
-    x: 0,
-    y: 0,
-    w: 0,
-    h: 0,
-    shape: "rect",
-    shapePoints: null,
-    accent: 0,
-    labelLines: [],
-    detailLines: [],
-    badge: null,
-    icon: null,
-    align: "center",
-  };
-}
