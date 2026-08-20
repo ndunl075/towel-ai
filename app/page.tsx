@@ -43,6 +43,8 @@ interface ExtractResponse {
   spec: DiagramSpec;
   source: "model" | "heuristic";
   note: string | null;
+  /** "anthropic" | "ollama", or null when the heuristic produced the spec. */
+  provider: string | null;
   error?: string;
 }
 
@@ -188,9 +190,7 @@ export default function Home() {
         }));
         setNotes((current) => ({
           ...current,
-          [sectionId]:
-            data.note ??
-            `Extracted with ${data.source === "model" ? "the model" : "the heuristic extractor"}.`,
+          [sectionId]: data.note ?? extractedWith(data),
         }));
         setPreview(null);
         setSelected(null);
@@ -555,6 +555,13 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+/** Naming the backend matters when one of them is a local model you chose. */
+function extractedWith(data: ExtractResponse): string {
+  if (data.source !== "model") return "Extracted with the heuristic extractor.";
+  if (data.provider === "ollama") return "Extracted locally with Ollama.";
+  return "Extracted with the model.";
 }
 
 function generateLabel(multi: boolean, made: boolean): string {

@@ -38,7 +38,7 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 | App | Next.js + React |
 | Layout | dagre + custom per-type fns |
 | Canvas | plain SVG + pointer events (skip tldraw for v0) |
-| LLM | any chat API w/ JSON mode, or local via Ollama for the local-first angle |
+| LLM | Anthropic w/ structured output, or local via Ollama for the local-first angle *(both shipped)* |
 | Export | client-side SVG→PNG (canvas) |
 
 ## Build order

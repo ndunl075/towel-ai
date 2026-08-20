@@ -1,20 +1,11 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-
 import { heuristicExtract } from "./heuristic";
-import {
-  DIAGRAM_TYPES,
-  DiagramSpecSchema,
-  normalizeSpec,
-  type DiagramSpec,
-  type DiagramType,
-} from "./spec";
+import { anthropicExtract, anthropicModel, hasCredentials } from "./providers/anthropic";
+import { ollamaExtract, ollamaModel, ollamaReachable } from "./providers/ollama";
+import { DIAGRAM_TYPES, type DiagramSpec, type DiagramType } from "./spec";
 
-const MODEL = process.env.NAPKIN_MODEL ?? "claude-opus-5";
-const EFFORT = (process.env.NAPKIN_EFFORT ?? "medium") as "low" | "medium" | "high";
-
+export type ProviderId = "anthropic" | "ollama";
 export type ExtractSource = "model" | "heuristic";
 
 export interface ExtractResult {
@@ -22,6 +13,8 @@ export interface ExtractResult {
   source: ExtractSource;
   /** Populated when we fell back, so the UI can be honest about it. */
   note: string | null;
+  /** Which provider produced the spec, or null when the heuristic did. */
+  provider: ProviderId | null;
 }
 
 const SYSTEM = `You turn prose into the structure of a diagram. You never draw
@@ -64,75 +57,99 @@ Rules:
   return type "list" with each idea as one node.`;
 
 /**
- * Stage 1 of the pipeline: exactly one model call, constrained to the spec
- * schema. One retry on an unusable response, then the heuristic extractor.
+ * Which backend to use.
+ *
+ * "auto" prefers the hosted API when a key is configured and otherwise falls to
+ * a local Ollama server, which is the local-first angle: no key, no network, no
+ * per-diagram cost. Naming a provider explicitly skips the guessing, and is
+ * what you want when both are available.
  */
-export async function extractSpec(
-  text: string,
-  typeHint?: DiagramType,
-): Promise<ExtractResult> {
-  if (!hasCredentials()) {
+export async function selectProvider(): Promise<ProviderId | null> {
+  const requested = (process.env.NAPKIN_PROVIDER ?? "auto").toLowerCase();
+
+  if (requested === "anthropic") return hasCredentials() ? "anthropic" : null;
+  if (requested === "ollama") return "ollama";
+
+  if (hasCredentials()) return "anthropic";
+  return (await ollamaReachable()) ? "ollama" : null;
+}
+
+export function providerLabel(provider: ProviderId): string {
+  return provider === "anthropic"
+    ? `the model (${anthropicModel()})`
+    : `Ollama (${ollamaModel()})`;
+}
+
+/**
+ * Stage 1 of the pipeline: one model call, constrained to the spec schema. One
+ * retry on an unusable response, then the heuristic extractor. The provider is
+ * interchangeable because both of them return a spec that already matched the
+ * schema - nothing downstream can tell which one ran.
+ */
+export async function extractSpec(text: string, typeHint?: DiagramType): Promise<ExtractResult> {
+  const provider = await selectProvider();
+
+  if (!provider) {
     return {
       spec: applyHint(heuristicExtract(text), typeHint),
       source: "heuristic",
-      note: "No ANTHROPIC_API_KEY set - used the built-in heuristic extractor.",
+      note: noProviderNote(),
+      provider: null,
     };
   }
 
-  const client = new Anthropic();
   let lastError = "";
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await client.messages.parse({
-        model: MODEL,
-        max_tokens: 8000,
-        system: SYSTEM,
-        output_config: {
-          format: zodOutputFormat(DiagramSpecSchema),
-          effort: EFFORT,
-        },
-        messages: [{ role: "user", content: userPrompt(text, typeHint, lastError) }],
-      });
+    const user = userPrompt(text, typeHint, lastError);
+    const result =
+      provider === "anthropic"
+        ? await anthropicExtract(SYSTEM, user)
+        : await ollamaExtract(SYSTEM, user);
 
-      if (response.stop_reason === "refusal") {
-        return {
-          spec: applyHint(heuristicExtract(text), typeHint),
-          source: "heuristic",
-          note: "The model declined this text - rendered with the heuristic extractor.",
-        };
-      }
-
-      const parsed = response.parsed_output;
-      if (!parsed) {
-        lastError = "The previous response did not match the schema.";
-        continue;
-      }
-
-      const spec = normalizeSpec(parsed);
-      if (spec.nodes.length === 0) {
-        lastError = "The previous response contained no nodes.";
-        continue;
-      }
-
-      return { spec: applyHint(spec, typeHint), source: "model", note: null };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      if (!isRetryable(error)) break;
+    if ("refused" in result && result.refused) {
+      return {
+        spec: applyHint(heuristicExtract(text), typeHint),
+        source: "heuristic",
+        note: "The model declined this text - rendered with the heuristic extractor.",
+        provider: null,
+      };
     }
+
+    if (result.spec && result.spec.nodes.length > 0) {
+      return { spec: applyHint(result.spec, typeHint), source: "model", note: null, provider };
+    }
+
+    if (result.spec) {
+      // Schema-valid but empty. Worth one re-ask with the complaint attached.
+      lastError = "The previous response contained no nodes.";
+      continue;
+    }
+
+    lastError = result.error ?? "unknown error";
+    if (!result.retry) break;
   }
 
   return {
     spec: applyHint(heuristicExtract(text), typeHint),
     source: "heuristic",
-    note: `Extraction failed (${lastError || "unknown error"}) - fell back to the heuristic extractor.`,
+    note: `${providerLabel(provider)} could not produce a usable spec (${lastError || "unknown error"}) - fell back to the heuristic extractor.`,
+    provider: null,
   };
+}
+
+function noProviderNote(): string {
+  const requested = (process.env.NAPKIN_PROVIDER ?? "auto").toLowerCase();
+  if (requested === "anthropic") {
+    return "NAPKIN_PROVIDER=anthropic but no ANTHROPIC_API_KEY is set - used the built-in heuristic extractor.";
+  }
+  return "No ANTHROPIC_API_KEY set and no Ollama server found - used the built-in heuristic extractor.";
 }
 
 function userPrompt(text: string, typeHint: DiagramType | undefined, priorError: string): string {
   const parts: string[] = [];
   if (priorError) {
-    parts.push(`${priorError} Return a valid diagram_spec this time.`);
+    parts.push(`${priorError} Return a valid diagram spec this time.`);
   }
   if (typeHint) {
     parts.push(
@@ -152,14 +169,4 @@ function applyHint(spec: DiagramSpec, typeHint?: DiagramType): DiagramSpec {
   return { ...spec, type: typeHint };
 }
 
-function isRetryable(error: unknown): boolean {
-  if (error instanceof Anthropic.APIError) {
-    const status = error.status ?? 0;
-    return status === 429 || status >= 500;
-  }
-  return error instanceof Anthropic.APIConnectionError;
-}
-
-export function hasCredentials(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
-}
+export { hasCredentials };

@@ -74,10 +74,25 @@ export function makeId(prefix: string, taken: Iterable<string>): string {
 }
 
 /**
+ * Placeholder text a model emits when it means "nothing".
+ *
+ * Constrained decoding guarantees a *string* where the schema asks for one, so
+ * a model with nothing to say fills the slot with the word instead of omitting
+ * the field - and a column header then renders as "null". Small local models do
+ * this often enough to matter. Only the two words that are never a real label
+ * are caught: "none" is a perfectly good thing to call a table row.
+ */
+function clean(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return /^(null|undefined)$/i.test(trimmed) ? null : trimmed;
+}
+
+/**
  * Repairs a spec that is schema-valid but structurally incoherent: dangling
- * edge endpoints, duplicate ids, self-loops, nodes pointing at missing groups.
- * A model that returns an edge to a node it never declared should not crash
- * the layout engine.
+ * edge endpoints, duplicate ids, self-loops, nodes pointing at missing groups,
+ * fields filled with the word "null". A model that returns an edge to a node it
+ * never declared should not crash the layout engine.
  */
 export function normalizeSpec(spec: DiagramSpec): DiagramSpec {
   const seen = new Set<string>();
@@ -88,9 +103,9 @@ export function normalizeSpec(spec: DiagramSpec): DiagramSpec {
     seen.add(id);
     nodes.push({
       id,
-      label: node.label.trim() || id,
-      detail: node.detail?.trim() ? node.detail.trim() : null,
-      group: node.group?.trim() ? node.group.trim() : null,
+      label: clean(node.label) ?? id,
+      detail: clean(node.detail),
+      group: clean(node.group),
     });
   }
 
@@ -100,7 +115,7 @@ export function normalizeSpec(spec: DiagramSpec): DiagramSpec {
     const id = group.id.trim();
     if (!id || groupIds.has(id)) continue;
     groupIds.add(id);
-    groups.push({ id, label: group.label.trim() || id });
+    groups.push({ id, label: clean(group.label) ?? id });
   }
 
   // A node may name a group that was never declared - declare it for them.
@@ -120,12 +135,12 @@ export function normalizeSpec(spec: DiagramSpec): DiagramSpec {
     const key = `${from} ${to}`;
     if (edgeKeys.has(key)) continue;
     edgeKeys.add(key);
-    edges.push({ from, to, label: edge.label?.trim() ? edge.label.trim() : null });
+    edges.push({ from, to, label: clean(edge.label) });
   }
 
   return {
     type: spec.type,
-    title: spec.title?.trim() ? spec.title.trim() : null,
+    title: clean(spec.title),
     nodes,
     edges,
     groups,
