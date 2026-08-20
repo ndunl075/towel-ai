@@ -1,5 +1,5 @@
 import { borderPoint, center, fmt, polarPoint, type Point, type Rect } from "@/lib/geom";
-import { finalize, sizeNode } from "./measure";
+import { finalize, iconResolver, sizeNode } from "./measure";
 import type { Layout, LayoutContext, RenderEdge, RenderNode } from "./types";
 
 /** How far past the node boxes each arc bows outward. */
@@ -18,7 +18,10 @@ export function layoutCycle(ctx: LayoutContext): Layout {
   const count = spec.nodes.length;
   if (count === 0) return finalize({ title: spec.title, nodes: [], edges: [], groups: [] }, theme);
 
-  const sized = spec.nodes.map((n) => sizeNode(n, theme, { maxWidth: 190, minWidth: 128 }));
+  const iconOf = iconResolver(ctx);
+  const sized = spec.nodes.map((n) =>
+    sizeNode(n, theme, { maxWidth: 190, minWidth: 128, icon: Boolean(iconOf(n)) }),
+  );
   const maxW = Math.max(...sized.map((s) => s.w));
   const maxH = Math.max(...sized.map((s) => s.h));
 
@@ -49,6 +52,7 @@ export function layoutCycle(ctx: LayoutContext): Layout {
       labelLines: size.labelLines,
       detailLines: size.detailLines,
       badge: null,
+      icon: iconOf(node),
       align: "center",
     };
   });

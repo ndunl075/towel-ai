@@ -45,7 +45,7 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 
 - **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here.
 - **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section. *(shipped)*
-- **v2:** multiple visual suggestions per text *(shipped, deterministically)*, icon library.
+- **v2:** multiple visual suggestions per text *(shipped, deterministically)*, icon library *(shipped)*.
 
 The suggestions item was scoped as parallel extraction with different type
 hints. It shipped as deterministic re-layout instead: layout already re-runs on

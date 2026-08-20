@@ -1,4 +1,4 @@
-import type { DiagramSpec, DiagramType } from "@/lib/spec";
+import type { DiagramNode, DiagramSpec, DiagramType } from "@/lib/spec";
 import type { Theme } from "@/lib/theme";
 import { layoutComparison } from "./comparison";
 import { layoutCycle } from "./cycle";
@@ -27,8 +27,12 @@ const LAYOUTS: Partial<Record<DiagramType, (ctx: LayoutContext) => Layout>> = {
   list: layoutList,
 };
 
-export function layoutSpec(spec: DiagramSpec, theme: Theme): Layout {
-  const ctx: LayoutContext = { spec, theme };
+export function layoutSpec(
+  spec: DiagramSpec,
+  theme: Theme,
+  iconFor?: (node: DiagramNode) => string | null,
+): Layout {
+  const ctx: LayoutContext = { spec, theme, iconFor };
   const fn = LAYOUTS[spec.type];
 
   if (!fn) {

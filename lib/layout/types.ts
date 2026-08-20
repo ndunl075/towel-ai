@@ -1,4 +1,4 @@
-import type { DiagramSpec, DiagramType } from "@/lib/spec";
+import type { DiagramNode, DiagramSpec, DiagramType } from "@/lib/spec";
 import type { Theme } from "@/lib/theme";
 import type { Point } from "@/lib/geom";
 
@@ -18,6 +18,8 @@ export interface RenderNode {
   detailLines: string[];
   /** Rendered above the label, e.g. step numbers in a list. */
   badge: string | null;
+  /** Icon id from lib/icons, drawn in the lead slot. Wins over `badge`. */
+  icon: string | null;
   align: "center" | "left";
 }
 
@@ -99,6 +101,12 @@ export interface Layout {
 export interface LayoutContext {
   spec: DiagramSpec;
   theme: Theme;
+  /**
+   * Resolves a node's icon. Supplied by layoutSpec rather than each layout so
+   * icons stay off unless the document asks for them, and so sizing and
+   * drawing agree about which nodes carry one.
+   */
+  iconFor?: (node: DiagramNode) => string | null;
 }
 
 export type LayoutFn = (ctx: LayoutContext) => Layout;

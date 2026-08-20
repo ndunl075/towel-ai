@@ -1,4 +1,4 @@
-import { finalize, sizeNode } from "./measure";
+import { finalize, iconResolver, sizeNode } from "./measure";
 import type { Layout, LayoutContext, RenderNode } from "./types";
 
 const WIDTH = 460;
@@ -12,6 +12,9 @@ const BADGE_INSET = 30;
  */
 export function layoutList(ctx: LayoutContext): Layout {
   const { spec, theme } = ctx;
+  // The badge already owns a lead slot here, and an icon takes the same one,
+  // so nothing needs to widen - the icon simply replaces the step number.
+  const iconOf = iconResolver(ctx);
   let y = 0;
 
   const nodes: RenderNode[] = spec.nodes.map((node, i) => {
@@ -32,6 +35,7 @@ export function layoutList(ctx: LayoutContext): Layout {
       labelLines: size.labelLines,
       detailLines: size.detailLines,
       badge: String(i + 1),
+      icon: iconOf(node),
       align: "left",
     };
     y += size.h + GAP;

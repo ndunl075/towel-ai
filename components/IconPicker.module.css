@@ -1,0 +1,63 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.search {
+  padding: 6px 9px;
+  font-size: 12.5px;
+}
+
+.row {
+  display: flex;
+  gap: 6px;
+}
+
+.none {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+
+.noneActive {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--ink);
+}
+
+.cellActive {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.cellActive:hover {
+  background: #35322e !important;
+  border-color: #35322e !important;
+}

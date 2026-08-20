@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
+import { IconPicker } from "@/components/IconPicker";
 import { SuggestionGrid } from "@/components/SuggestionGrid";
 import {
   addNode,
@@ -10,12 +11,16 @@ import {
   canUndo,
   commit,
   deleteNode,
+  iconForNode,
   moveNode,
   newDoc,
   newHistory,
   redo,
+  resetIcon,
   resetPositions,
+  setIcon,
   setLabel,
+  setShowIcons,
   setTheme,
   setType,
   undo,
@@ -29,7 +34,8 @@ import { applyOffsets } from "@/lib/layout/overrides";
 import { SAMPLES } from "@/lib/samples";
 import { splitSections } from "@/lib/sections";
 import { suggestTypes } from "@/lib/suggestions";
-import { type DiagramSpec, type DiagramType } from "@/lib/spec";
+import { autoIconFor } from "@/lib/icons";
+import { type DiagramNode, type DiagramSpec, type DiagramType } from "@/lib/spec";
 import { getTheme, THEMES } from "@/lib/theme";
 import styles from "./page.module.css";
 
@@ -88,17 +94,24 @@ export default function Home() {
   // Offsets in flight during a drag are not in the document yet.
   const offsets = preview ?? doc?.offsets ?? {};
 
+  const iconFor = useCallback(
+    (node: DiagramNode) => (doc ? iconForNode(doc, node) : null),
+    [doc],
+  );
+
   const layout = useMemo(() => {
     if (!doc) return null;
-    return applyOffsets(layoutSpec(doc.spec, theme), offsets);
-  }, [doc, theme, offsets]);
+    return applyOffsets(layoutSpec(doc.spec, theme, iconFor), offsets);
+  }, [doc, theme, offsets, iconFor]);
 
   // Eight layouts of the same spec, ~4ms, and none of it touches the model.
   // Keyed off the spec and theme only - dragging a node must not re-rank.
   const suggestions = useMemo(
-    () => (doc ? suggestTypes(doc.spec, theme) : []),
-    [doc?.spec, theme],
+    () => (doc ? suggestTypes(doc.spec, theme, iconFor) : []),
+    [doc?.spec, theme, iconFor],
   );
+
+  const selectedNode = doc?.spec.nodes.find((n) => n.id === selected) ?? null;
 
   const select = useCallback((id: string) => {
     setPinned(id);
@@ -400,6 +413,38 @@ export default function Home() {
                 ))}
               </div>
               <p className={styles.hint}>{theme.name}</p>
+            </section>
+
+            <section className={styles.section}>
+              <h2>Icons</h2>
+              <label className={styles.toggle}>
+                <input
+                  type="checkbox"
+                  checked={doc.showIcons}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    apply((current) => setShowIcons(current, on));
+                  }}
+                />
+                <span>Match icons from the text</span>
+              </label>
+              {doc.showIcons &&
+                (selectedNode ? (
+                  <IconPicker
+                    value={iconForNode(doc, selectedNode)}
+                    auto={
+                      !Object.prototype.hasOwnProperty.call(doc.icons, selectedNode.id) &&
+                      autoIconFor(selectedNode.label, selectedNode.detail) !== null
+                    }
+                    onPick={(id) => apply((current) => setIcon(current, selectedNode.id, id))}
+                    onReset={() => apply((current) => resetIcon(current, selectedNode.id))}
+                  />
+                ) : (
+                  <p className={styles.hint}>
+                    Select a node to change its icon. Funnels and venns carry none - a
+                    lead slot would sit over the shape.
+                  </p>
+                ))}
             </section>
 
             <section className={styles.section}>

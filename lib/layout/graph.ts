@@ -12,7 +12,7 @@ import {
   type Point,
   type Rect,
 } from "@/lib/geom";
-import { finalize, sizeNode } from "./measure";
+import { finalize, iconResolver, sizeNode } from "./measure";
 import type { Layout, LayoutContext, RenderEdge, RenderGroup, RenderNode } from "./types";
 
 export interface GraphOptions {
@@ -30,8 +30,11 @@ export interface GraphOptions {
  */
 export function layoutGraph(ctx: LayoutContext, opts: GraphOptions): Layout {
   const { spec, theme } = ctx;
+  const iconOf = iconResolver(ctx);
   const sized = new Map<string, ReturnType<typeof sizeNode>>();
-  for (const node of spec.nodes) sized.set(node.id, sizeNode(node, theme));
+  for (const node of spec.nodes) {
+    sized.set(node.id, sizeNode(node, theme, { icon: Boolean(iconOf(node)) }));
+  }
 
   const positions = runDagre(spec.nodes, spec, theme, opts, sized, true);
 
@@ -51,6 +54,7 @@ export function layoutGraph(ctx: LayoutContext, opts: GraphOptions): Layout {
       labelLines: size.labelLines,
       detailLines: size.detailLines,
       badge: null,
+      icon: iconOf(node),
       align: "center",
     };
   });
