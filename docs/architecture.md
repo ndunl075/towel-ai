@@ -45,7 +45,14 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 
 - **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here.
 - **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section. *(shipped)*
-- **v2:** multiple visual suggestions per text (parallel extraction w/ different type hints), icon library.
+- **v2:** multiple visual suggestions per text *(shipped, deterministically)*, icon library.
+
+The suggestions item was scoped as parallel extraction with different type
+hints. It shipped as deterministic re-layout instead: layout already re-runs on
+the spec in hand, so all eight alternatives render for free rather than costing
+one model call each — which matters for a bring-your-own-key app whose extract
+route is rate limited. Re-extraction with a type hint is still available for the
+case that actually needs it, once the user has picked a shape.
 
 ## Risks
 

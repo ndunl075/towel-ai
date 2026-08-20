@@ -77,6 +77,7 @@ heuristic extractor.
 | The spec | `lib/spec.ts` — zod schema, normalisation, repair |
 | 2. Layout | `lib/layout/` — `graph.ts` (dagre), `cycle.ts`, `comparison.ts`, `timeline.ts`, `funnel.ts`, `venn.ts`, `list.ts` |
 | 3. Render | `components/DiagramSvg.tsx`, `lib/theme.ts` |
+| Suggestions | `lib/suggestions.ts` — ranks every type, `components/SuggestionGrid.tsx` draws them |
 | 4. Editor | `lib/document.ts` (doc + history), `lib/layout/overrides.ts`, `components/Canvas.tsx` |
 | Export | `lib/export.ts` — SVG, PNG, clipboard |
 | Abuse control | `lib/ratelimit.ts` — per-client cap on the one route that spends money |
@@ -104,11 +105,25 @@ still reads as the same nudge. Edges touching a moved node re-route as straight
 border-to-border lines — keeping the original dagre spline would leave the
 arrow pointing at where the node used to be.
 
-**Type switching** re-lays out the spec you already have, with no second model
-call. This is the escape hatch for a misclassification, which is the main
-quality failure mode. When the type was wrong because the *text* was misread
-rather than mislaid out, **Re-extract as ‹type›** spends one call to read the
-text again for that shape.
+**Suggestions.** The type picker draws its alternatives instead of naming
+them: every tile is the real renderer on the real spec, ranked, with the reason
+it scored where it did. Picking one is free — it only changes which layout
+function runs over the spec already in hand — so a misclassification, the main
+quality failure mode, is fixed by looking rather than by guessing from a list of
+type names. Tiles the spec cannot make are dimmed and preview the layout it
+would degrade to, which is what you would actually get.
+
+Ranking reads what each layout actually consumes. `flowchart` and `hierarchy`
+are edge-driven and say nothing without edges. `cycle`, `timeline` and `funnel`
+are *order*-driven — they build geometry from the order nodes arrive in, which
+is why the cycle fixture carries no edges at all and is still a perfectly good
+ring. `comparison` and `venn` are group-driven, and a node left ungrouped while
+groups exist is the venn overlap, which is exactly what a comparison has no
+column for. Details that parse as numbers which never rise are a funnel and
+nothing else.
+
+When the type was wrong because the *text* was misread rather than mislaid out,
+**Re-extract as ‹type›** spends one call to read the text again for that shape.
 
 **Sections.** A heading (`#` or setext) starts a new section, and each section
 is its own diagram with its own undo history. Regenerate one and the other
@@ -130,8 +145,8 @@ needs a rule: a node carrying a `group` sits in that set's exclusive lobe, and
 a node with `group: null` is shared by every set and sits in the middle. The
 extraction prompt states the same rule.
 
-That closes v1. Not built yet: multiple suggestions per text (v2), icon library
-(v2).
+That closes v1, and v2's multiple-suggestions item. Not built yet: the icon
+library (v2).
 
 ## How extraction fails safely
 

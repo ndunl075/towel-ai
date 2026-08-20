@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
+import { SuggestionGrid } from "@/components/SuggestionGrid";
 import {
   addNode,
   canRedo,
@@ -27,7 +28,8 @@ import { layoutSpec } from "@/lib/layout";
 import { applyOffsets } from "@/lib/layout/overrides";
 import { SAMPLES } from "@/lib/samples";
 import { splitSections } from "@/lib/sections";
-import { IMPLEMENTED_TYPES, type DiagramSpec, type DiagramType } from "@/lib/spec";
+import { suggestTypes } from "@/lib/suggestions";
+import { type DiagramSpec, type DiagramType } from "@/lib/spec";
 import { getTheme, THEMES } from "@/lib/theme";
 import styles from "./page.module.css";
 
@@ -90,6 +92,13 @@ export default function Home() {
     if (!doc) return null;
     return applyOffsets(layoutSpec(doc.spec, theme), offsets);
   }, [doc, theme, offsets]);
+
+  // Eight layouts of the same spec, ~4ms, and none of it touches the model.
+  // Keyed off the spec and theme only - dragging a node must not re-rank.
+  const suggestions = useMemo(
+    () => (doc ? suggestTypes(doc.spec, theme) : []),
+    [doc?.spec, theme],
+  );
 
   const select = useCallback((id: string) => {
     setPinned(id);
@@ -336,21 +345,17 @@ export default function Home() {
             <section className={styles.section}>
               <h2>Diagram type</h2>
               <p className={styles.hint}>
-                Misread the text? Switch the type - it re-lays out the same spec, no second
-                model call.
+                Every alternative, drawn from the spec you already have. Picking one is
+                free - it only changes which layout runs. Dimmed tiles are shapes this
+                spec cannot make.
               </p>
-              <div className={styles.types}>
-                {IMPLEMENTED_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`${styles.chip} ${doc.spec.type === type ? styles.chipActive : ""}`}
-                    onClick={() => apply((current) => setType(current, type))}
-                  >
-                    {TYPE_LABELS[type]}
-                  </button>
-                ))}
-              </div>
+              <SuggestionGrid
+                suggestions={suggestions}
+                theme={theme}
+                current={doc.spec.type}
+                labels={TYPE_LABELS}
+                onPick={(type) => apply((current) => setType(current, type))}
+              />
               {layout.degradedFrom && (
                 <p className={styles.hint}>
                   This spec does not fit <code>{layout.degradedFrom}</code> - showing the
