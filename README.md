@@ -123,7 +123,8 @@ regression, and it never spends a model call.
 
 ## Status
 
-**v0 and v1 are shipped.**
+**Everything in [`docs/architecture.md`](docs/architecture.md) is built** — v0,
+v1 and v2, and both LLM backends the stack table calls for.
 
 All eight spec types have a real layout: `flowchart`, `hierarchy`, `cycle`,
 `comparison`, `timeline`, `funnel`, `venn`, `list`. Four themes, applied at

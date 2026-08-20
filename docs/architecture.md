@@ -2,6 +2,10 @@
 
 **Thesis:** paste text, get a clean editable visual. One LLM call, deterministic rendering.
 
+> **Status: complete.** Every stage, both LLM backends, and all three
+> milestones below are implemented. See the README for what each one does and
+> where it lives.
+
 ## Pipeline
 
 ```
@@ -43,7 +47,7 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 
 ## Build order
 
-- **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here.
+- **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here. *(shipped)*
 - **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section. *(shipped)*
 - **v2:** multiple visual suggestions per text *(shipped, deterministically)*, icon library *(shipped)*.
 
