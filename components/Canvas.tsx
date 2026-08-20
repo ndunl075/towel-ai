@@ -30,7 +30,20 @@ interface DragState {
   originX: number;
   originY: number;
   base: Offset;
+  /** True once the pointer moved far enough to be a drag rather than a click. */
+  captured: boolean;
 }
+
+/**
+ * Screen pixels of movement before a press counts as a drag.
+ *
+ * Capture cannot be taken on press. While an element holds pointer capture the
+ * browser retargets the compatibility mouse events to it too, so the node's own
+ * dblclick never fires and double-click-to-rename silently stops working. A
+ * click does not move, so waiting for movement keeps clicks and double-clicks
+ * clear of capture entirely.
+ */
+const DRAG_THRESHOLD = 3;
 
 /**
  * The editing surface. Everything here mutates the document and re-renders
@@ -75,9 +88,8 @@ export function Canvas({
         originX: event.clientX,
         originY: event.clientY,
         base: offsets[id] ?? { dx: 0, dy: 0 },
+        captured: false,
       };
-      setDragging(true);
-      (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
     },
     [editing, offsets, onSelect],
   );
@@ -86,6 +98,22 @@ export function Canvas({
     (event: React.PointerEvent) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
+
+      if (!drag.captured) {
+        const travelled = Math.hypot(event.clientX - drag.originX, event.clientY - drag.originY);
+        if (travelled < DRAG_THRESHOLD) return;
+        drag.captured = true;
+        setDragging(true);
+        // Capture on the stage, not on the node. beginDrag selects the node and
+        // the renderer paints the selected node last, so React immediately moves
+        // that <g> to the end of its parent. Moving the capturing element drops
+        // the capture, the pointerup lands outside the stage, endDrag never runs,
+        // and the drag survives only as preview - not committed, not undoable,
+        // and discarded by the next edit. The stage owns the move and up
+        // handlers and never moves.
+        stageRef.current?.setPointerCapture?.(event.pointerId);
+      }
+
       // Screen pixels are zoomed pixels; layout space is not.
       onDragPreview({
         ...offsets,
@@ -103,17 +131,20 @@ export function Canvas({
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       dragRef.current = null;
+
+      // Never moved: a click, or the first half of a double-click. Nothing to
+      // commit, and no history entry to spend on it.
+      if (!drag.captured) return;
+
       setDragging(false);
+      if (stageRef.current?.hasPointerCapture?.(event.pointerId)) {
+        stageRef.current.releasePointerCapture(event.pointerId);
+      }
       const dx = drag.base.dx + (event.clientX - drag.originX) / zoom;
       const dy = drag.base.dy + (event.clientY - drag.originY) / zoom;
-      // A click is a drag of zero length; do not spend a history entry on it.
-      if (Math.abs(dx - drag.base.dx) < 0.5 && Math.abs(dy - drag.base.dy) < 0.5) {
-        onDragPreview(offsets);
-        return;
-      }
       onDragCommit({ ...offsets, [drag.id]: { dx, dy } });
     },
-    [offsets, onDragCommit, onDragPreview, zoom],
+    [offsets, onDragCommit, zoom],
   );
 
   const startEditing = useCallback(
