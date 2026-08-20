@@ -255,7 +255,35 @@ falls back to the list layout rather than taking the page down.
 npm run dev        # dev server
 npm run build      # production build
 npm run typecheck  # tsc --noEmit
+npm test           # vitest, the unit suite
+npm run test:watch # the same, watching
 ```
+
+## Tests
+
+`tests/` covers the deterministic half of the app — everything downstream of
+extraction, which is everything that decides what you see. The model is never
+called, so the suite is fast and needs no key.
+
+| File | What it pins |
+|---|---|
+| `sections.test.ts` | headings split, blank lines never do, ids are content-addressed |
+| `suggestions.test.ts` | ranking: edge-driven vs order-driven vs group-driven types |
+| `spec.test.ts` | `normalizeSpec` repairs, and the `list` last resort |
+| `layout.test.ts` | every fixture in every type and every theme, boxes fit their text |
+| `text.test.ts` | per-family advance widths, wrapping |
+| `icons.test.ts` | whole-word longest-first matching, glyphs inside the grid |
+| `document.test.ts` | history, offsets, and icon override vs auto |
+| `ratelimit.test.ts` | windows, cost, all-or-nothing, bounded memory |
+
+The suite is mutation-checked rather than assumed useful: reintroducing each of
+the real bugs this project has had — a monospace face measured with proportional
+widths, `normalizeSpec` keeping the word `null`, the limiter ignoring cost,
+sections splitting on blank lines, cycle scored on edges alone, the venn
+overlap signal removed — turns it red every time.
+
+`/fixtures` complements it. The suite asserts geometry; the page shows you the
+drawing, which is the part no assertion is going to catch.
 
 ## Contributing
 
