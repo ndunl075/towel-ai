@@ -252,7 +252,9 @@ function Edge({
       ? `${idPrefix}-arrow-default`
       : `${idPrefix}-arrow-${edge.accent % theme.accents.length}`;
 
-  const labelWidth = edge.label ? measureText(edge.label, theme.font.edgeLabel) + 12 : 0;
+  const labelWidth = edge.label
+    ? measureText(edge.label, theme.font.edgeLabel, false, theme.font.metric) + 12
+    : 0;
 
   return (
     <g>

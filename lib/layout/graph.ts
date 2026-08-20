@@ -133,7 +133,7 @@ function runDagre(
       edge.to,
       label
         ? {
-            width: Math.ceil(measureText(label, theme.font.edgeLabel)) + 12,
+            width: Math.ceil(measureText(label, theme.font.edgeLabel, false, theme.font.metric)) + 12,
             height: Math.ceil(theme.font.edgeLabel * 1.5),
             labelpos: "c",
           }

@@ -31,11 +31,15 @@ export function layoutFunnel(ctx: LayoutContext): Layout {
     // Text has to fit the narrow end, not the wide one.
     const usable = bottomWidth - 36;
     const label = wrapText(node.label, usable, theme.font.label, theme.font.lineHeight, {
+      metric: theme.font.metric,
       bold: true,
       maxLines: 2,
     });
     const detail = node.detail
-      ? wrapText(node.detail, usable, theme.font.detail, theme.font.lineHeight, { maxLines: 1 })
+      ? wrapText(node.detail, usable, theme.font.detail, theme.font.lineHeight, {
+          maxLines: 1,
+          metric: theme.font.metric,
+        })
       : null;
     const height = Math.max(
       MIN_BAND_HEIGHT,
@@ -90,6 +94,7 @@ function singleBand(ctx: LayoutContext): Layout {
   const { spec, theme } = ctx;
   const node = spec.nodes[0];
   const label = wrapText(node.label, TOP_WIDTH - 40, theme.font.label, theme.font.lineHeight, {
+    metric: theme.font.metric,
     bold: true,
     maxLines: 2,
   });

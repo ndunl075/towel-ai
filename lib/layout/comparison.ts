@@ -25,6 +25,7 @@ export function layoutComparison(ctx: LayoutContext): Layout {
   const headerHeight = (label: string) =>
     Math.ceil(
       wrapText(label, COLUMN_WIDTH - 2 * PANEL_PAD - 12, theme.font.label, theme.font.lineHeight, {
+        metric: theme.font.metric,
         bold: true,
         maxLines: 2,
       }).height + 22,
@@ -61,7 +62,7 @@ export function layoutComparison(ctx: LayoutContext): Layout {
       COLUMN_WIDTH - 2 * PANEL_PAD - 12,
       theme.font.label,
       theme.font.lineHeight,
-      { bold: true, maxLines: 2 },
+      { bold: true, maxLines: 2, metric: theme.font.metric },
     ).lines;
 
     groups.push({

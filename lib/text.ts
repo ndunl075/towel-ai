@@ -5,7 +5,30 @@
  * it cannot measure with a canvas context. These per-character advance widths
  * are calibrated against the system sans stack in `theme.ts` and are accurate
  * to a few percent - close enough that padding absorbs the error.
+ *
+ * A theme that changes the typeface changes the metrics with it, so every
+ * measurement takes the family's profile. Getting this wrong is not cosmetic:
+ * measure a monospace face with proportional widths and every box is sized for
+ * text a third narrower than what actually renders.
  */
+
+export type FontMetric = "sans" | "serif" | "mono" | "round";
+
+/**
+ * Monospace advance, as a fraction of font size. Every glyph is this wide,
+ * which is the whole point of the classification - the per-character table
+ * below is meaningless for such a face.
+ */
+const MONO_ADVANCE = 0.6;
+
+/** Scale on the proportional table, per family. */
+const PROPORTIONAL_SCALE: Record<Exclude<FontMetric, "mono">, number> = {
+  sans: 1,
+  // Serif faces set a little tighter at the same nominal size.
+  serif: 0.97,
+  // Casual and rounded faces set noticeably wider.
+  round: 1.08,
+};
 
 const NARROW = "iljtfrI.,;:!|'`()[]{}-/\\ ";
 const WIDE = "mwMW@%";
@@ -24,9 +47,20 @@ function charWidth(ch: string): number {
   return 0.545;
 }
 
-export function measureText(text: string, fontSize: number, bold = false): number {
+export function measureText(
+  text: string,
+  fontSize: number,
+  bold = false,
+  metric: FontMetric = "sans",
+): number {
   let units = 0;
-  for (const ch of text) units += charWidth(ch);
+  if (metric === "mono") {
+    // Count code points, not UTF-16 units, so an emoji is one cell.
+    for (const _ of text) units += MONO_ADVANCE;
+  } else {
+    for (const ch of text) units += charWidth(ch);
+    units *= PROPORTIONAL_SCALE[metric];
+  }
   // Semibold runs a touch wider than regular.
   return units * fontSize * (bold ? 1.045 : 1);
 }
@@ -46,9 +80,10 @@ export function wrapText(
   maxWidth: number,
   fontSize: number,
   lineHeight: number,
-  opts: { bold?: boolean; maxLines?: number } = {},
+  opts: { bold?: boolean; maxLines?: number; metric?: FontMetric } = {},
 ): WrappedText {
   const bold = opts.bold ?? false;
+  const metric = opts.metric ?? "sans";
   const maxLines = opts.maxLines ?? 4;
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
@@ -61,12 +96,12 @@ export function wrapText(
 
   for (const word of words) {
     const candidate = current ? `${current} ${word}` : word;
-    if (measureText(candidate, fontSize, bold) <= maxWidth || !current) {
-      if (measureText(candidate, fontSize, bold) > maxWidth && !current) {
+    if (measureText(candidate, fontSize, bold, metric) <= maxWidth || !current) {
+      if (measureText(candidate, fontSize, bold, metric) > maxWidth && !current) {
         // Single word too wide for the box: hard-break it.
         let chunk = "";
         for (const ch of word) {
-          if (measureText(chunk + ch, fontSize, bold) > maxWidth && chunk) {
+          if (measureText(chunk + ch, fontSize, bold, metric) > maxWidth && chunk) {
             lines.push(chunk);
             chunk = ch;
           } else {
@@ -94,7 +129,7 @@ export function wrapText(
 
   return {
     lines: out,
-    width: Math.max(...out.map((l) => measureText(l, fontSize, bold))),
+    width: Math.max(...out.map((l) => measureText(l, fontSize, bold, metric))),
     height: out.length * fontSize * lineHeight,
   };
 }

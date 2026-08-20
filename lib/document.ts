@@ -130,6 +130,17 @@ export function setDetail(doc: DiagramDoc, id: string, detail: string): DiagramD
   });
 }
 
+/**
+ * Replaces the structure wholesale, keeping the theme and the icon settings.
+ *
+ * Used when adopting a re-extracted alternative: the nodes are different nodes,
+ * so drag offsets and per-node icon overrides refer to ids that may no longer
+ * exist and are dropped rather than silently reattached to the wrong box.
+ */
+export function adoptSpec(doc: DiagramDoc, spec: DiagramSpec): DiagramDoc {
+  return { ...doc, spec: normalizeSpec(spec), offsets: {}, icons: {} };
+}
+
 export function setType(doc: DiagramDoc, type: DiagramType): DiagramDoc {
   if (doc.spec.type === type) return doc;
   // Offsets were chosen against a different layout, so they no longer mean

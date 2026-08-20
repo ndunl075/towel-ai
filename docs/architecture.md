@@ -49,14 +49,22 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 
 - **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here. *(shipped)*
 - **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section. *(shipped)*
-- **v2:** multiple visual suggestions per text *(shipped, deterministically)*, icon library *(shipped)*.
+- **v2:** multiple visual suggestions per text *(shipped)*, icon library *(shipped)*.
 
-The suggestions item was scoped as parallel extraction with different type
-hints. It shipped as deterministic re-layout instead: layout already re-runs on
-the spec in hand, so all eight alternatives render for free rather than costing
-one model call each — which matters for a bring-your-own-key app whose extract
-route is rate limited. Re-extraction with a type hint is still available for the
-case that actually needs it, once the user has picked a shape.
+The suggestions item shipped as two layers, because the two are answering
+different questions and only one of them needs to cost anything.
+
+*Free, always on:* every type is re-laid out from the spec already in hand and
+drawn as a tile, so choosing between shapes is a matter of looking rather than
+guessing from a list of names. No model call.
+
+*Paid, on request:* **parallel extraction with different type hints**, as
+scoped here. Re-layout can only rearrange the nodes the model already picked; a
+comparison of the same text wants *different nodes* than a flowchart of it —
+columns of attributes, not a chain of steps re-stacked. Only a second extraction
+produces that. Three at a time, chosen by the free ranking so the deterministic
+work decides where the expensive work goes, and charged to the rate limiter as
+three requests rather than one.
 
 ## Risks
 

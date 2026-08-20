@@ -85,13 +85,16 @@ diagram rather than a broken one.
 | `OLLAMA_MODEL` | `llama3.1` | Model to ask for |
 | `NAPKIN_OLLAMA_THINK` | unset | `1` to let a reasoning model think first (slow) |
 | `NAPKIN_OLLAMA_TIMEOUT` | `120000` | Milliseconds before giving up on a local call |
-| `NAPKIN_RATE_LIMIT` | `20` | Extraction requests allowed per window, per client. `0` disables |
+| `NAPKIN_RATE_LIMIT` | `20` | Model requests allowed per window, per client, across every route. `0` disables |
 | `NAPKIN_RATE_WINDOW` | `60` | Rate-limit window, in seconds |
 
 ### Deploying this where other people can reach it
 
-`/api/extract` is the one route that spends money, so it is rate limited per
-client address — 20 requests a minute by default. Run locally it never fires.
+`/api/extract` and `/api/suggest` are the routes that spend money, so they are
+rate limited per client address — 20 requests a minute by default, against **one
+shared budget**. Give each route its own allowance and a client just alternates
+between them. `/api/suggest` is charged for every call it is about to make, so
+three alternatives cost three, all-or-nothing. Run locally it never fires.
 
 Read the limiter as a seatbelt, not a lock. State is per process, so serverless
 instances each keep their own counters and a cold start forgets everything, and
@@ -106,6 +109,7 @@ heuristic extractor.
 | Stage | Files |
 |---|---|
 | Providers | `lib/providers/anthropic.ts`, `lib/providers/ollama.ts` |
+| Alternatives | `extractVariants` in `lib/extract.ts`, `app/api/suggest/route.ts` |
 | 0. Sectioning | `lib/sections.ts` — splits the paste into independently diagrammable parts |
 | 1. Structure extraction | `lib/extract.ts` (model), `lib/heuristic.ts` (fallback), `app/api/extract/route.ts` |
 | The spec | `lib/spec.ts` — zod schema, normalisation, repair |
@@ -128,7 +132,12 @@ v1 and v2, and both LLM backends the stack table calls for.
 
 All eight spec types have a real layout: `flowchart`, `hierarchy`, `cycle`,
 `comparison`, `timeline`, `funnel`, `venn`, `list`. Four themes, applied at
-render time. The canvas is editable, and export covers PNG, SVG and clipboard.
+render time — each with its own typeface, not just its own palette, so
+`measureText` carries a per-family advance profile: measure a monospace face with
+proportional widths and every box comes out sized for text a third narrower than
+what renders. `/fixtures?theme=<id>` renders the whole sheet in one theme, which
+is the fastest way to catch that. The canvas is editable, and export covers PNG,
+SVG and clipboard.
 
 **Editing.** Drag a node to move it, double-click to rename it, Backspace to
 delete it, plus Add node and Reset layout. Cmd/Ctrl+Z undoes anything, theme
@@ -160,6 +169,14 @@ nothing else.
 
 When the type was wrong because the *text* was misread rather than mislaid out,
 **Re-extract as ‹type›** spends one call to read the text again for that shape.
+
+**Alternatives.** The tiles can only rearrange nodes the model already picked.
+**Re-extract 3 alternatives** reads the text again for three different shapes in
+parallel, so a comparison gets columns of attributes rather than a chain of steps
+re-stacked. The free ranking picks which three are worth paying for, and the rate
+limiter is charged three requests rather than one — a single click that fans out
+into several model calls has to count as several, or the cap means nothing.
+Adopting one is free and undoable.
 
 **Sections.** A heading (`#` or setext) starts a new section, and each section
 is its own diagram with its own undo history. Regenerate one and the other
