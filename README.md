@@ -57,6 +57,7 @@ still runs end to end offline. With a key set, extraction goes through
 
 | Stage | Files |
 |---|---|
+| 0. Sectioning | `lib/sections.ts` — splits the paste into independently diagrammable parts |
 | 1. Structure extraction | `lib/extract.ts` (model), `lib/heuristic.ts` (fallback), `app/api/extract/route.ts` |
 | The spec | `lib/spec.ts` — zod schema, normalisation, repair |
 | 2. Layout | `lib/layout/` — `graph.ts` (dagre), `cycle.ts`, `comparison.ts`, `timeline.ts`, `funnel.ts`, `venn.ts`, `list.ts` |
@@ -89,15 +90,32 @@ arrow pointing at where the node used to be.
 
 **Type switching** re-lays out the spec you already have, with no second model
 call. This is the escape hatch for a misclassification, which is the main
-quality failure mode.
+quality failure mode. When the type was wrong because the *text* was misread
+rather than mislaid out, **Re-extract as ‹type›** spends one call to read the
+text again for that shape.
+
+**Sections.** A heading (`#` or setext) starts a new section, and each section
+is its own diagram with its own undo history. Regenerate one and the other
+diagrams are untouched — which is the point, since a long document usually has
+exactly one part the model read badly.
+
+Only a heading splits; a blank line never does. Prose routinely writes a lead-in
+line, a blank, then the body it introduces — the "Build vs buy" sample does
+exactly that — so splitting on blanks would cut a single comparison into pieces
+that each mean nothing alone. A document with no headings stays one section, and
+the app behaves exactly as it did before sections existed.
+
+Section ids are a hash of the section's own text, so editing section three
+changes only section three's id. Sections one and two keep the diagrams already
+generated for them, and undoing the edit brings section three's back from cache.
 
 **Venn convention.** The spec gives a node one group, so overlap membership
 needs a rule: a node carrying a `group` sits in that set's exclusive lobe, and
 a node with `group: null` is shared by every set and sits in the middle. The
 extraction prompt states the same rule.
 
-Not built yet: regenerate-per-section, multiple suggestions per text (v2), icon
-library (v2).
+That closes v1. Not built yet: multiple suggestions per text (v2), icon library
+(v2).
 
 ## How extraction fails safely
 

@@ -44,7 +44,7 @@ The LLM never draws. It only classifies and extracts. All visual output is deter
 ## Build order
 
 - **v0 (1 day):** text → flowchart + cycle + comparison only, 1 theme, PNG export. Ship the demo here.
-- **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section.
+- **v1 (2–3 days):** remaining diagram types, themes, drag/edit, regenerate-per-section. *(shipped)*
 - **v2:** multiple visual suggestions per text (parallel extraction w/ different type hints), icon library.
 
 ## Risks

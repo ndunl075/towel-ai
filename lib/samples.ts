@@ -48,4 +48,30 @@ Buying an off-the-shelf platform:
 afternoon and made everything look like a photograph of itself. Nobody ever
 agreed on where the desks should go, and somehow that never mattered.`,
   },
+  {
+    id: "sections",
+    label: "Multi-section",
+    text: `# Onboarding
+
+A new user signs up, verifies their email, then picks a workspace. If the email
+never gets verified the account is purged after seven days.
+
+# Billing tiers
+
+Free vs Pro.
+
+Free:
+- One workspace
+- Community support
+
+Pro:
+- Unlimited workspaces
+- Priority support and an SLA
+
+# Release loop
+
+We cut a release candidate every Tuesday, run it through staging, then ship to
+ten percent of traffic. What we learn there decides whether we roll forward or
+roll back, and either way it feeds the next candidate.`,
+  },
 ];
