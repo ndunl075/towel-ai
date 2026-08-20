@@ -37,8 +37,9 @@ still runs end to end offline. With a key set, extraction goes through
 |---|---|
 | 1. Structure extraction | `lib/extract.ts` (model), `lib/heuristic.ts` (fallback), `app/api/extract/route.ts` |
 | The spec | `lib/spec.ts` — zod schema, normalisation, repair |
-| 2. Layout | `lib/layout/` — `graph.ts` (dagre), `cycle.ts`, `comparison.ts`, `list.ts` |
+| 2. Layout | `lib/layout/` — `graph.ts` (dagre), `cycle.ts`, `comparison.ts`, `timeline.ts`, `funnel.ts`, `venn.ts`, `list.ts` |
 | 3. Render | `components/DiagramSvg.tsx`, `lib/theme.ts` |
+| 4. Editor | `lib/document.ts` (doc + history), `lib/layout/overrides.ts`, `components/Canvas.tsx` |
 | Export | `lib/export.ts` — SVG, PNG, clipboard |
 
 `/fixtures` renders every layout from static specs in `lib/fixtures.ts`. Because
@@ -47,17 +48,34 @@ regression, and it never spends a model call.
 
 ## Status
 
-**v0 is shipped.** Text in, diagram out, one theme, PNG/SVG/clipboard export.
+**v0 and v1 are shipped.**
 
-- Layouts: `flowchart`, `hierarchy`, `cycle`, `comparison`, `list`
-- `timeline`, `funnel` and `venn` are valid spec types but have no layout yet —
-  they degrade to a styled list and say so in the UI
-- Manual type switching re-lays out the spec you already have, with no second
-  model call. This is the escape hatch for a misclassification, which is the
-  main quality failure mode.
+All eight spec types have a real layout: `flowchart`, `hierarchy`, `cycle`,
+`comparison`, `timeline`, `funnel`, `venn`, `list`. Four themes, applied at
+render time. The canvas is editable, and export covers PNG, SVG and clipboard.
 
-Not built yet (v1): drag, inline text editing, undo/redo, more themes,
-regenerate-per-section.
+**Editing.** Drag a node to move it, double-click to rename it, Backspace to
+delete it, plus Add node and Reset layout. Cmd/Ctrl+Z undoes anything, theme
+switches and type switches included, because the whole editor state is one
+`DiagramDoc` and history is a stack of those.
+
+Drag positions are stored as *offsets* from wherever the layout engine put the
+node, not as absolute points. Rename a node so its box resizes, and the nudge
+still reads as the same nudge. Edges touching a moved node re-route as straight
+border-to-border lines — keeping the original dagre spline would leave the
+arrow pointing at where the node used to be.
+
+**Type switching** re-lays out the spec you already have, with no second model
+call. This is the escape hatch for a misclassification, which is the main
+quality failure mode.
+
+**Venn convention.** The spec gives a node one group, so overlap membership
+needs a rule: a node carrying a `group` sits in that set's exclusive lobe, and
+a node with `group: null` is shared by every set and sits in the middle. The
+extraction prompt states the same rule.
+
+Not built yet: regenerate-per-section, multiple suggestions per text (v2), icon
+library (v2).
 
 ## How extraction fails safely
 

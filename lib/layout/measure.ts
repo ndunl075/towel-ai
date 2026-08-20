@@ -2,7 +2,14 @@ import type { DiagramNode } from "@/lib/spec";
 import type { Theme } from "@/lib/theme";
 import { measureText, wrapText } from "@/lib/text";
 import { pathBounds, translatePath, type Rect } from "@/lib/geom";
-import { PAGE_PADDING, TITLE_GAP, type Layout, type RenderNode } from "./types";
+import {
+  PAGE_PADDING,
+  TITLE_GAP,
+  type Caption,
+  type Decoration,
+  type Layout,
+  type RenderNode,
+} from "./types";
 
 export interface SizedNode {
   labelLines: string[];
@@ -62,18 +69,30 @@ export function clamp(n: number, lo: number, hi: number): number {
  * the title, and reports the final canvas size.
  */
 export function finalize(
-  partial: Omit<Layout, "width" | "height" | "titleHeight" | "degradedFrom"> & {
+  partial: Omit<
+    Layout,
+    "width" | "height" | "titleHeight" | "degradedFrom" | "decorations" | "captions"
+  > & {
     degradedFrom?: Layout["degradedFrom"];
+    decorations?: Decoration[];
+    captions?: Caption[];
+    /** Rects that claim space without drawing anything. */
+    extraBounds?: Rect[];
   },
   theme: Theme,
 ): Layout {
   const { nodes, edges, groups, title } = partial;
-  // Edges are part of the drawing: a cycle's arcs bow past every node box, and
-  // sizing from node boxes alone would crop them.
+  const decorations = partial.decorations ?? [];
+  const captions = partial.captions ?? [];
+  // Edges and decorations are part of the drawing: a cycle's arcs bow past
+  // every node box, and sizing from node boxes alone would crop them.
   const boxes: Rect[] = [
     ...nodes,
     ...groups,
     ...edges.map((e) => pathBounds(e.d)).filter((b): b is Rect => b !== null),
+    ...decorations.map(decorationBounds),
+    ...captions.map((c) => captionBounds(c, theme)),
+    ...(partial.extraBounds ?? []),
   ];
   const minX = boxes.length ? Math.min(...boxes.map((n) => n.x)) : 0;
   const minY = boxes.length ? Math.min(...boxes.map((n) => n.y)) : 0;
@@ -84,13 +103,25 @@ export function finalize(
   const dx = PAGE_PADDING - minX;
   const dy = PAGE_PADDING + titleHeight - minY;
 
-  const shiftedNodes = nodes.map((n) => ({ ...n, x: n.x + dx, y: n.y + dy }));
+  const shiftedNodes = nodes.map((n) => ({
+    ...n,
+    x: n.x + dx,
+    y: n.y + dy,
+    shapePoints: n.shapePoints?.map((p) => ({ x: p.x + dx, y: p.y + dy })) ?? null,
+  }));
   const shiftedGroups = groups.map((g) => ({ ...g, x: g.x + dx, y: g.y + dy }));
   const shiftedEdges = edges.map((e) => ({
     ...e,
     d: translatePath(e.d, dx, dy),
     labelAt: e.labelAt ? { x: e.labelAt.x + dx, y: e.labelAt.y + dy } : null,
   }));
+
+  const shiftedDecorations = decorations.map((d) =>
+    d.kind === "circle"
+      ? { ...d, cx: d.cx + dx, cy: d.cy + dy }
+      : { ...d, x1: d.x1 + dx, y1: d.y1 + dy, x2: d.x2 + dx, y2: d.y2 + dy },
+  );
+  const shiftedCaptions = captions.map((c) => ({ ...c, x: c.x + dx, y: c.y + dy }));
 
   const contentWidth = maxX - minX;
   const titleWidth = title ? measureText(title, theme.font.title, true) : 0;
@@ -103,8 +134,32 @@ export function finalize(
     nodes: shiftedNodes,
     edges: shiftedEdges,
     groups: shiftedGroups,
+    decorations: shiftedDecorations,
+    captions: shiftedCaptions,
     degradedFrom: partial.degradedFrom ?? null,
   };
+}
+
+/** Approximate, but it only has to stop a caption being cropped at the edge. */
+function captionBounds(caption: Caption, theme: Theme): Rect {
+  const size = caption.size === "label" ? theme.font.label : theme.font.detail;
+  const width = measureText(caption.text, size, caption.weight >= 600) * (caption.uppercase ? 1.12 : 1);
+  const x =
+    caption.anchor === "middle"
+      ? caption.x - width / 2
+      : caption.anchor === "end"
+        ? caption.x - width
+        : caption.x;
+  return { x, y: caption.y - size, w: width, h: size * 1.4 };
+}
+
+function decorationBounds(d: Decoration): Rect {
+  if (d.kind === "circle") {
+    return { x: d.cx - d.r, y: d.cy - d.r, w: d.r * 2, h: d.r * 2 };
+  }
+  const x = Math.min(d.x1, d.x2);
+  const y = Math.min(d.y1, d.y2);
+  return { x, y, w: Math.abs(d.x2 - d.x1), h: Math.abs(d.y2 - d.y1) };
 }
 
 export function emptyNode(id: string): RenderNode {
@@ -115,6 +170,7 @@ export function emptyNode(id: string): RenderNode {
     w: 0,
     h: 0,
     shape: "rect",
+    shapePoints: null,
     accent: 0,
     labelLines: [],
     detailLines: [],

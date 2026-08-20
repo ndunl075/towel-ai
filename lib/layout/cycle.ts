@@ -44,6 +44,7 @@ export function layoutCycle(ctx: LayoutContext): Layout {
       w: size.w,
       h: size.h,
       shape: "rect",
+      shapePoints: null,
       accent: i,
       labelLines: size.labelLines,
       detailLines: size.detailLines,

@@ -50,6 +50,12 @@ Rules:
   Every node.group must match a declared group id.
 - For cycle, list the nodes in the order they occur and connect them in that
   order, including the edge back to the first node.
+- For timeline, list events in chronological order and put the time itself in
+  "detail" ("Q3 2024", "day one"). Edges are not needed.
+- For funnel, list stages widest first, each a subset of the one above.
+- For venn, declare two or three groups as the sets. A node that belongs to one
+  set carries that group id; a node shared by every set has group null. Do not
+  invent a group for the overlap.
 - 3-9 nodes is the readable range. Merge or drop detail rather than exceeding
   12 nodes.
 - title is the subject of the diagram in under 8 words, or null if the text

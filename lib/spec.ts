@@ -25,6 +25,9 @@ export const IMPLEMENTED_TYPES: DiagramType[] = [
   "cycle",
   "hierarchy",
   "comparison",
+  "timeline",
+  "funnel",
+  "venn",
   "list",
 ];
 

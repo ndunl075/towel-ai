@@ -2,22 +2,28 @@ import type { DiagramSpec, DiagramType } from "@/lib/spec";
 import type { Theme } from "@/lib/theme";
 import { layoutComparison } from "./comparison";
 import { layoutCycle } from "./cycle";
+import { layoutFunnel } from "./funnel";
 import { layoutGraph } from "./graph";
 import { layoutList } from "./list";
+import { layoutTimeline } from "./timeline";
+import { layoutVenn } from "./venn";
 import type { Layout, LayoutContext } from "./types";
 
 export type { Layout, RenderEdge, RenderGroup, RenderNode } from "./types";
 
 /**
- * Type -> layout function. Types without an entry fall back to `list`, which is
- * how unimplemented v1 types (timeline, funnel, venn) degrade gracefully
- * instead of rendering nothing.
+ * Type -> layout function. Every spec type has one; the mapping is still
+ * partial so a type added to the spec before its layout exists degrades to a
+ * list rather than rendering nothing.
  */
 const LAYOUTS: Partial<Record<DiagramType, (ctx: LayoutContext) => Layout>> = {
   flowchart: (ctx) => layoutGraph(ctx, { rankdir: "LR" }),
   hierarchy: (ctx) => layoutGraph(ctx, { rankdir: "TB", ranksep: 56 }),
   cycle: layoutCycle,
   comparison: layoutComparison,
+  timeline: layoutTimeline,
+  funnel: layoutFunnel,
+  venn: layoutVenn,
   list: layoutList,
 };
 

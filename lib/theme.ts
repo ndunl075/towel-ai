@@ -108,7 +108,85 @@ export const paperTheme: Theme = {
   },
 };
 
-export const THEMES: Theme[] = [paperTheme];
+/** Cool, low-chroma, technical. One structural accent doing most of the work. */
+export const blueprintTheme: Theme = {
+  ...paperTheme,
+  id: "blueprint",
+  name: "Blueprint",
+  background: "#F4F6F9",
+  grid: "#E1E7EF",
+  ink: "#12212F",
+  muted: "#5C6B7A",
+  accents: [
+    { stroke: "#1D4ED8", fill: "#E6EDFC", text: "#122B6B" },
+    { stroke: "#0E7490", fill: "#E2F1F5", text: "#0A3C48" },
+    { stroke: "#475569", fill: "#EAEEF3", text: "#25303D" },
+    { stroke: "#7E22CE", fill: "#F1E9FB", text: "#421070" },
+    { stroke: "#0F766E", fill: "#E3F1EF", text: "#0A3F3A" },
+  ],
+  node: { ...paperTheme.node, radius: 4, strokeWidth: 1.5, shadow: null },
+  edge: { ...paperTheme.edge, stroke: "#8C9AAA", width: 1.5, labelBackground: "#F4F6F9" },
+  group: {
+    stroke: "#CFD8E3",
+    fill: "#EAEFF5",
+    radius: 6,
+    labelColor: "#5C6B7A",
+  },
+};
+
+/** Dark. Saturated strokes on near-black, no shadows to muddy the contrast. */
+export const midnightTheme: Theme = {
+  ...paperTheme,
+  id: "midnight",
+  name: "Midnight",
+  background: "#14161B",
+  grid: "#22262E",
+  ink: "#F2F3F5",
+  muted: "#9BA3AF",
+  accents: [
+    { stroke: "#818CF8", fill: "#232544", text: "#DDDEFB" },
+    { stroke: "#2DD4BF", fill: "#12332F", text: "#CBF5EE" },
+    { stroke: "#FBBF24", fill: "#33280F", text: "#FBECC8" },
+    { stroke: "#F472B6", fill: "#361A28", text: "#FBD9E8" },
+    { stroke: "#60A5FA", fill: "#17293F", text: "#D3E4FB" },
+  ],
+  node: { ...paperTheme.node, radius: 12, strokeWidth: 1.5, shadow: null },
+  edge: { ...paperTheme.edge, stroke: "#5B6270", width: 1.75, labelBackground: "#14161B" },
+  group: {
+    stroke: "#2E333D",
+    fill: "#1B1E25",
+    radius: 16,
+    labelColor: "#9BA3AF",
+  },
+};
+
+/** Loud and flat. Thick strokes, no tint gradient, for slides seen from the back row. */
+export const markerTheme: Theme = {
+  ...paperTheme,
+  id: "marker",
+  name: "Marker",
+  background: "#FFFDF8",
+  grid: null,
+  ink: "#171512",
+  muted: "#6E6656",
+  accents: [
+    { stroke: "#1F2937", fill: "#FDE68A", text: "#1F2937" },
+    { stroke: "#1F2937", fill: "#A7F3D0", text: "#1F2937" },
+    { stroke: "#1F2937", fill: "#BFDBFE", text: "#1F2937" },
+    { stroke: "#1F2937", fill: "#FBCFE8", text: "#1F2937" },
+    { stroke: "#1F2937", fill: "#DDD6FE", text: "#1F2937" },
+  ],
+  node: { radius: 14, strokeWidth: 2.5, paddingX: 20, paddingY: 15, shadow: null },
+  edge: { stroke: "#1F2937", width: 2.5, arrow: 10, labelBackground: "#FFFDF8" },
+  group: {
+    stroke: "#1F2937",
+    fill: "#FFF8E6",
+    radius: 16,
+    labelColor: "#171512",
+  },
+};
+
+export const THEMES: Theme[] = [paperTheme, blueprintTheme, midnightTheme, markerTheme];
 
 export function getTheme(id: string | undefined): Theme {
   return THEMES.find((t) => t.id === id) ?? paperTheme;

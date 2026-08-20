@@ -135,17 +135,71 @@ export const FIXTURES: { name: string; spec: DiagramSpec }[] = [
     }),
   },
   {
-    name: "timeline - no layout yet, degrades to list",
+    name: "timeline",
     spec: normalizeSpec({
       type: "timeline",
       title: "Roadmap",
       nodes: [
-        { id: "v0", label: "v0 ships the demo", detail: "One day", group: null },
-        { id: "v1", label: "v1 adds the editor", detail: "Two to three days", group: null },
-        { id: "v2", label: "v2 suggests variants", detail: null, group: null },
+        { id: "v0", label: "Ship the demo", detail: "One day", group: null },
+        { id: "v1", label: "Editor and themes", detail: "Two to three days", group: null },
+        { id: "v2", label: "Multiple suggestions", detail: "Later", group: null },
+        { id: "v3", label: "Icon library", detail: "Unscheduled", group: null },
       ],
       edges: [],
       groups: [],
+    }),
+  },
+  {
+    name: "funnel",
+    spec: normalizeSpec({
+      type: "funnel",
+      title: "Signup funnel",
+      nodes: [
+        { id: "visit", label: "Landing page visits", detail: "42,000 a month", group: null },
+        { id: "trial", label: "Started a trial", detail: "6,100", group: null },
+        { id: "active", label: "Made a diagram", detail: "2,400", group: null },
+        { id: "paid", label: "Converted to paid", detail: "410", group: null },
+      ],
+      edges: [],
+      groups: [],
+    }),
+  },
+  {
+    name: "venn - two sets",
+    spec: normalizeSpec({
+      type: "venn",
+      title: "What we are actually building",
+      nodes: [
+        { id: "a1", label: "Structure extraction", detail: null, group: "llm" },
+        { id: "a2", label: "Type classification", detail: null, group: "llm" },
+        { id: "b1", label: "Layout engine", detail: null, group: "deterministic" },
+        { id: "b2", label: "Theming", detail: null, group: "deterministic" },
+        { id: "shared", label: "The JSON spec", detail: null, group: null },
+      ],
+      edges: [],
+      groups: [
+        { id: "llm", label: "Model" },
+        { id: "deterministic", label: "Pure code" },
+      ],
+    }),
+  },
+  {
+    name: "venn - three sets",
+    spec: normalizeSpec({
+      type: "venn",
+      title: "Why the demo works",
+      nodes: [
+        { id: "d1", label: "Theme polish", detail: null, group: "design" },
+        { id: "s1", label: "One model call", detail: null, group: "speed" },
+        { id: "c1", label: "Deterministic SVG", detail: null, group: "control" },
+        { id: "core", label: "Editable output", detail: null, group: null },
+      ],
+      edges: [],
+      groups: [
+        { id: "design", label: "Design" },
+        { id: "speed", label: "Speed" },
+        { id: "control", label: "Control" },
+      ],
     }),
   },
 ];

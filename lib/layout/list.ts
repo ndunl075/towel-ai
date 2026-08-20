@@ -27,6 +27,7 @@ export function layoutList(ctx: LayoutContext): Layout {
       w: WIDTH,
       h: size.h,
       shape: "pill",
+      shapePoints: null,
       accent: i,
       labelLines: size.labelLines,
       detailLines: size.detailLines,

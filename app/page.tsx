@@ -1,13 +1,33 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { DiagramSvg } from "@/components/DiagramSvg";
+import { Canvas } from "@/components/Canvas";
+import {
+  addNode,
+  canRedo,
+  canUndo,
+  commit,
+  deleteNode,
+  moveNode,
+  newDoc,
+  newHistory,
+  redo,
+  resetPositions,
+  setLabel,
+  setTheme,
+  setType,
+  undo,
+  type DiagramDoc,
+  type History,
+  type Offset,
+} from "@/lib/document";
 import { copyPngToClipboard, downloadPng, downloadSvg, slugifyFilename } from "@/lib/export";
 import { layoutSpec } from "@/lib/layout";
+import { applyOffsets } from "@/lib/layout/overrides";
 import { SAMPLES } from "@/lib/samples";
 import { IMPLEMENTED_TYPES, type DiagramSpec, type DiagramType } from "@/lib/spec";
-import { paperTheme } from "@/lib/theme";
+import { getTheme, THEMES } from "@/lib/theme";
 import styles from "./page.module.css";
 
 interface ExtractResponse {
@@ -22,64 +42,99 @@ const TYPE_LABELS: Record<DiagramType, string> = {
   cycle: "Cycle",
   hierarchy: "Hierarchy",
   comparison: "Comparison",
-  list: "List",
   timeline: "Timeline",
   funnel: "Funnel",
   venn: "Venn",
+  list: "List",
 };
 
 export default function Home() {
   const [text, setText] = useState(SAMPLES[0].text);
-  const [spec, setSpec] = useState<DiagramSpec | null>(null);
+  const [history, setHistory] = useState<History | null>(null);
+  const [preview, setPreview] = useState<Record<string, Offset> | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
-  const svgRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
-  const theme = paperTheme;
-  const layout = useMemo(() => (spec ? layoutSpec(spec, theme) : null), [spec, theme]);
+  const doc = history?.present ?? null;
+  const theme = getTheme(doc?.themeId);
 
-  const generate = useCallback(
-    async (typeHint?: DiagramType) => {
-      if (!text.trim()) {
-        setError("Paste some text first.");
+  // Offsets in flight during a drag are not in the document yet.
+  const offsets = preview ?? doc?.offsets ?? {};
+
+  const layout = useMemo(() => {
+    if (!doc) return null;
+    return applyOffsets(layoutSpec(doc.spec, theme), offsets);
+  }, [doc, theme, offsets]);
+
+  /** Every undoable change funnels through here. */
+  const apply = useCallback((fn: (doc: DiagramDoc) => DiagramDoc) => {
+    setPreview(null);
+    setHistory((current) => (current ? commit(current, fn(current.present)) : current));
+  }, []);
+
+  const generate = useCallback(async () => {
+    if (!text.trim()) {
+      setError("Paste some text first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = (await response.json()) as ExtractResponse;
+      if (!response.ok) throw new Error(data.error ?? "Extraction failed");
+      // A fresh extraction starts a new document; the old edit history belonged
+      // to a different diagram.
+      setHistory(newHistory(newDoc(data.spec, doc?.themeId ?? THEMES[0].id)));
+      setPreview(null);
+      setSelected(null);
+      setStatus(
+        data.note ??
+          `Extracted with ${data.source === "model" ? "the model" : "the heuristic extractor"}.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }, [text, doc]);
+
+  // Keyboard: undo/redo and delete, the three shortcuts an editor must have.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+
+      const mod = event.metaKey || event.ctrlKey;
+      if (mod && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        setPreview(null);
+        setHistory((current) =>
+          current ? (event.shiftKey ? redo(current) : undo(current)) : current,
+        );
         return;
       }
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch("/api/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, typeHint }),
-        });
-        const data = (await response.json()) as ExtractResponse;
-        if (!response.ok) throw new Error(data.error ?? "Extraction failed");
-        setSpec(data.spec);
-        setStatus(data.note ?? `Extracted with ${data.source === "model" ? "the model" : "the heuristic extractor"}.`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      } finally {
-        setLoading(false);
+      if ((event.key === "Backspace" || event.key === "Delete") && selected) {
+        event.preventDefault();
+        const id = selected;
+        setSelected(null);
+        apply((current) => deleteNode(current, id));
       }
-    },
-    [text],
-  );
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [apply, selected]);
 
-  /**
-   * Switching type re-lays out the spec we already have - no second model call.
-   * This is the escape hatch for a misclassified diagram.
-   */
-  const switchType = useCallback(
-    (type: DiagramType) => {
-      setSpec((current) => (current ? { ...current, type } : current));
-    },
-    [],
-  );
-
-  const getSvg = () => svgRef.current?.querySelector("svg") as SVGSVGElement | null;
+  const getSvg = () => stageRef.current?.querySelector("svg") as SVGSVGElement | null;
 
   const flash = (message: string) => {
     setToast(message);
@@ -88,15 +143,15 @@ export default function Home() {
 
   const onExportPng = async () => {
     const svg = getSvg();
-    if (!svg || !spec) return;
-    await downloadPng(svg, `${slugifyFilename(spec.title)}.png`);
+    if (!svg || !doc) return;
+    await downloadPng(svg, `${slugifyFilename(doc.spec.title)}.png`);
     flash("PNG downloaded");
   };
 
   const onExportSvg = () => {
     const svg = getSvg();
-    if (!svg || !spec) return;
-    downloadSvg(svg, `${slugifyFilename(spec.title)}.svg`);
+    if (!svg || !doc) return;
+    downloadSvg(svg, `${slugifyFilename(doc.spec.title)}.svg`);
     flash("SVG downloaded");
   };
 
@@ -141,7 +196,7 @@ export default function Home() {
 
         <button
           className={`primary ${styles.generate}`}
-          onClick={() => generate()}
+          onClick={generate}
           disabled={loading}
           type="button"
         >
@@ -151,57 +206,122 @@ export default function Home() {
         {error && <p className={styles.error}>{error}</p>}
         {!error && status && <p className={styles.status}>{status}</p>}
 
-        {spec && (
-          <section className={styles.section}>
-            <h2>Diagram type</h2>
-            <p className={styles.hint}>
-              Misread the text? Switch the type - it re-lays out the same spec, no
-              second model call.
-            </p>
-            <div className={styles.types}>
-              {IMPLEMENTED_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`${styles.chip} ${spec.type === type ? styles.chipActive : ""}`}
-                  onClick={() => switchType(type)}
-                >
-                  {TYPE_LABELS[type]}
-                </button>
-              ))}
-            </div>
-            {layout?.degradedFrom && (
+        {doc && layout && (
+          <>
+            <section className={styles.section}>
+              <h2>Diagram type</h2>
               <p className={styles.hint}>
-                No layout for <code>{layout.degradedFrom}</code> yet - showing it as a
-                list.
+                Misread the text? Switch the type - it re-lays out the same spec, no
+                second model call.
               </p>
-            )}
-          </section>
-        )}
+              <div className={styles.types}>
+                {IMPLEMENTED_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`${styles.chip} ${doc.spec.type === type ? styles.chipActive : ""}`}
+                    onClick={() => apply((current) => setType(current, type))}
+                  >
+                    {TYPE_LABELS[type]}
+                  </button>
+                ))}
+              </div>
+              {layout.degradedFrom && (
+                <p className={styles.hint}>
+                  This spec does not fit <code>{layout.degradedFrom}</code> - showing the
+                  closest layout that works.
+                </p>
+              )}
+            </section>
 
-        {spec && (
-          <section className={styles.section}>
-            <h2>Export</h2>
-            <div className={styles.exports}>
-              <button type="button" onClick={onExportPng}>
-                PNG
-              </button>
-              <button type="button" onClick={onExportSvg}>
-                SVG
-              </button>
-              <button type="button" onClick={onCopy}>
-                Copy
-              </button>
-            </div>
-          </section>
+            <section className={styles.section}>
+              <h2>Theme</h2>
+              <div className={styles.themes}>
+                {THEMES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    title={option.name}
+                    aria-label={option.name}
+                    aria-pressed={doc.themeId === option.id}
+                    className={`${styles.swatch} ${doc.themeId === option.id ? styles.swatchActive : ""}`}
+                    style={{ background: option.background }}
+                    onClick={() => apply((current) => setTheme(current, option.id))}
+                  >
+                    <span style={{ background: option.accents[0].stroke }} />
+                    <span style={{ background: option.accents[1].stroke }} />
+                    <span style={{ background: option.accents[2].stroke }} />
+                  </button>
+                ))}
+              </div>
+              <p className={styles.hint}>{theme.name}</p>
+            </section>
+
+            <section className={styles.section}>
+              <h2>Edit</h2>
+              <p className={styles.hint}>
+                Drag to move, double-click to rename, Backspace to delete. Cmd/Ctrl+Z
+                undoes anything, theme switches included.
+              </p>
+              <div className={styles.exports}>
+                <button
+                  type="button"
+                  disabled={!canUndo(history!)}
+                  onClick={() => {
+                    setPreview(null);
+                    setHistory((current) => (current ? undo(current) : current));
+                  }}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  disabled={!canRedo(history!)}
+                  onClick={() => {
+                    setPreview(null);
+                    setHistory((current) => (current ? redo(current) : current));
+                  }}
+                >
+                  Redo
+                </button>
+              </div>
+              <div className={styles.exports}>
+                <button type="button" onClick={() => apply((c) => addNode(c, selected))}>
+                  Add node
+                </button>
+                <button
+                  type="button"
+                  disabled={Object.keys(doc.offsets).length === 0}
+                  onClick={() => apply(resetPositions)}
+                >
+                  Reset layout
+                </button>
+              </div>
+            </section>
+
+            <section className={styles.section}>
+              <h2>Export</h2>
+              <div className={styles.exports}>
+                <button type="button" onClick={onExportPng}>
+                  PNG
+                </button>
+                <button type="button" onClick={onExportSvg}>
+                  SVG
+                </button>
+                <button type="button" onClick={onCopy}>
+                  Copy
+                </button>
+              </div>
+            </section>
+          </>
         )}
       </aside>
 
       <section className={styles.canvasWrap}>
         <div className={styles.canvasBar}>
           <span className={styles.meta}>
-            {spec
-              ? `${TYPE_LABELS[spec.type]} · ${spec.nodes.length} nodes · ${spec.edges.length} edges`
+            {doc
+              ? `${TYPE_LABELS[doc.spec.type]} · ${doc.spec.nodes.length} nodes · ${doc.spec.edges.length} edges`
               : "No diagram yet"}
           </span>
           <div className={styles.zoom}>
@@ -218,14 +338,33 @@ export default function Home() {
           </div>
         </div>
 
-        <div className={styles.canvas}>
-          {layout ? (
-            <div
-              ref={svgRef}
-              className={styles.stage}
-              style={{ transform: `scale(${zoom})` }}
-            >
-              <DiagramSvg layout={layout} theme={theme} />
+        <div
+          className={styles.canvas}
+          style={{ backgroundColor: theme.background, backgroundImage: gridImage(theme.grid) }}
+        >
+          {doc && layout ? (
+            <div ref={stageRef}>
+              <Canvas
+                layout={layout}
+                spec={doc.spec}
+                theme={theme}
+                zoom={zoom}
+                offsets={offsets}
+                selected={selected}
+                onSelect={setSelected}
+                onDragPreview={setPreview}
+                onDragCommit={(next) => {
+                  const entries = Object.entries(next);
+                  setPreview(null);
+                  setHistory((current) => {
+                    if (!current) return current;
+                    let updated = current.present;
+                    for (const [id, offset] of entries) updated = moveNode(updated, id, offset);
+                    return commit(current, updated);
+                  });
+                }}
+                onEditLabel={(id, label) => apply((current) => setLabel(current, id, label))}
+              />
             </div>
           ) : (
             <div className={styles.empty}>
@@ -238,4 +377,8 @@ export default function Home() {
       </section>
     </main>
   );
+}
+
+function gridImage(color: string | null): string | undefined {
+  return color ? `radial-gradient(${color} 1px, transparent 1px)` : "none";
 }

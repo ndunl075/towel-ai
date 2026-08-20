@@ -1,4 +1,5 @@
 import type { Layout, RenderEdge, RenderGroup, RenderNode } from "@/lib/layout";
+import type { Caption, Decoration } from "@/lib/layout/types";
 import { accentFor, type Theme } from "@/lib/theme";
 import { measureText } from "@/lib/text";
 
@@ -100,13 +101,25 @@ export function DiagramSvg({
       </g>
 
       <g>
+        {layout.decorations.map((decoration) => (
+          <DecorationShape key={decoration.id} decoration={decoration} theme={theme} />
+        ))}
+      </g>
+
+      <g>
         {layout.edges.map((edge) => (
           <Edge key={edge.id} edge={edge} theme={theme} idPrefix={idPrefix} />
         ))}
       </g>
 
       <g>
-        {layout.nodes.map((node) => (
+        {layout.captions.map((caption) => (
+          <CaptionText key={caption.id} caption={caption} theme={theme} />
+        ))}
+      </g>
+
+      <g>
+        {paintOrder(layout.nodes, selected).map((node) => (
           <Node
             key={node.id}
             node={node}
@@ -120,6 +133,74 @@ export function DiagramSvg({
         ))}
       </g>
     </svg>
+  );
+}
+
+/**
+ * Nodes paint in spec order, so a node dragged over a later sibling would
+ * disappear underneath it. The selected one always goes last.
+ */
+function paintOrder(nodes: RenderNode[], selected: string | null): RenderNode[] {
+  if (!selected || !nodes.some((n) => n.id === selected)) return nodes;
+  return [...nodes.filter((n) => n.id !== selected), ...nodes.filter((n) => n.id === selected)];
+}
+
+function DecorationShape({ decoration, theme }: { decoration: Decoration; theme: Theme }) {
+  const accent = decoration.accent === null ? null : accentFor(theme, decoration.accent);
+
+  if (decoration.kind === "circle") {
+    return (
+      <circle
+        cx={decoration.cx}
+        cy={decoration.cy}
+        r={decoration.r}
+        fill={circleFill(decoration.fill, accent, theme)}
+        fillOpacity={decoration.fill === "tint" ? 0.72 : 1}
+        stroke={accent?.stroke ?? theme.edge.stroke}
+        strokeWidth={theme.node.strokeWidth}
+      />
+    );
+  }
+
+  return (
+    <line
+      x1={decoration.x1}
+      y1={decoration.y1}
+      x2={decoration.x2}
+      y2={decoration.y2}
+      stroke={accent?.stroke ?? theme.edge.stroke}
+      strokeWidth={theme.edge.width}
+      strokeLinecap="round"
+      strokeDasharray={decoration.dashed ? "5 5" : undefined}
+    />
+  );
+}
+
+function circleFill(
+  mode: "tint" | "solid" | "none",
+  accent: { stroke: string; fill: string } | null,
+  theme: Theme,
+): string {
+  if (mode === "none") return "none";
+  if (mode === "solid") return accent?.stroke ?? theme.ink;
+  return accent?.fill ?? theme.group.fill;
+}
+
+function CaptionText({ caption, theme }: { caption: Caption; theme: Theme }) {
+  const accent = caption.accent === null ? null : accentFor(theme, caption.accent);
+  return (
+    <text
+      x={caption.x}
+      y={caption.y}
+      textAnchor={caption.anchor}
+      fill={accent?.stroke ?? theme.muted}
+      fontFamily={theme.font.family}
+      fontSize={caption.size === "label" ? theme.font.label : theme.font.detail}
+      fontWeight={caption.weight}
+      letterSpacing={caption.uppercase ? "0.06em" : undefined}
+    >
+      {caption.uppercase ? caption.text.toUpperCase() : caption.text}
+    </text>
   );
 }
 
@@ -247,17 +328,27 @@ function Node({
       onDoubleClick={interactive && onDoubleClick ? (e) => onDoubleClick(node.id, e) : undefined}
       style={interactive ? { cursor: "grab" } : undefined}
     >
-      <rect
-        x={node.x}
-        y={node.y}
-        width={node.w}
-        height={node.h}
-        rx={radius}
-        fill={isHeader ? accent.stroke : accent.fill}
-        stroke={isHeader ? accent.stroke : accent.stroke}
-        strokeWidth={theme.node.strokeWidth}
-        filter={theme.node.shadow ? `url(#${idPrefix}-shadow)` : undefined}
-      />
+      {node.shapePoints ? (
+        <polygon
+          points={node.shapePoints.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill={accent.fill}
+          stroke={accent.stroke}
+          strokeWidth={theme.node.strokeWidth}
+          strokeLinejoin="round"
+        />
+      ) : (
+        <rect
+          x={node.x}
+          y={node.y}
+          width={node.w}
+          height={node.h}
+          rx={radius}
+          fill={isHeader ? accent.stroke : accent.fill}
+          stroke={accent.stroke}
+          strokeWidth={theme.node.strokeWidth}
+          filter={theme.node.shadow ? `url(#${idPrefix}-shadow)` : undefined}
+        />
+      )}
 
       {selected && (
         <rect

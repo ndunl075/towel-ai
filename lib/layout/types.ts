@@ -2,7 +2,7 @@ import type { DiagramSpec, DiagramType } from "@/lib/spec";
 import type { Theme } from "@/lib/theme";
 import type { Point } from "@/lib/geom";
 
-export type NodeShape = "rect" | "pill" | "circle" | "header" | "banner";
+export type NodeShape = "rect" | "pill" | "circle" | "header" | "banner" | "polygon";
 
 export interface RenderNode {
   id: string;
@@ -11,6 +11,8 @@ export interface RenderNode {
   w: number;
   h: number;
   shape: NodeShape;
+  /** Outline used instead of the rect when `shape` is "polygon" (funnel bands). */
+  shapePoints: Point[] | null;
   accent: number;
   labelLines: string[];
   detailLines: string[];
@@ -40,6 +42,46 @@ export interface RenderGroup {
   accent: number;
 }
 
+/**
+ * Chrome that is neither a node nor an edge: the timeline spine, the circles
+ * of a venn, the tick marks under a funnel. Kept as explicit geometry rather
+ * than raw path strings so the final origin shift stays trivial and exact.
+ */
+export type Decoration =
+  | {
+      kind: "circle";
+      id: string;
+      cx: number;
+      cy: number;
+      r: number;
+      accent: number;
+      /** "tint" is a translucent wash, "solid" a marker dot, "none" outline only. */
+      fill: "tint" | "solid" | "none";
+    }
+  | {
+      kind: "line";
+      id: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      accent: number | null;
+      dashed: boolean;
+    };
+
+/** Free-standing text outside any node - timeline dates, venn set names. */
+export interface Caption {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  accent: number | null;
+  size: "label" | "detail";
+  anchor: "start" | "middle" | "end";
+  weight: number;
+  uppercase: boolean;
+}
+
 export interface Layout {
   width: number;
   height: number;
@@ -48,6 +90,8 @@ export interface Layout {
   nodes: RenderNode[];
   edges: RenderEdge[];
   groups: RenderGroup[];
+  decorations: Decoration[];
+  captions: Caption[];
   /** Set when the requested type had no layout fn and we degraded to another. */
   degradedFrom: DiagramType | null;
 }
