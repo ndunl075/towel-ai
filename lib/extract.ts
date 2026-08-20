@@ -3,7 +3,7 @@ import "server-only";
 import { heuristicExtract } from "./heuristic";
 import { anthropicExtract, anthropicModel, hasCredentials } from "./providers/anthropic";
 import { ollamaExtract, ollamaModel, ollamaReachable } from "./providers/ollama";
-import { DIAGRAM_TYPES, type DiagramSpec, type DiagramType } from "./spec";
+import { DIAGRAM_TYPES, listSpecFromText, type DiagramSpec, type DiagramType } from "./spec";
 
 export type ProviderId = "anthropic" | "ollama";
 export type ExtractSource = "model" | "heuristic";
@@ -91,7 +91,7 @@ export async function extractSpec(text: string, typeHint?: DiagramType): Promise
 
   if (!provider) {
     return {
-      spec: applyHint(heuristicExtract(text), typeHint),
+      spec: applyHint(safeHeuristic(text), typeHint),
       source: "heuristic",
       note: noProviderNote(),
       provider: null,
@@ -109,7 +109,7 @@ export async function extractSpec(text: string, typeHint?: DiagramType): Promise
 
     if ("refused" in result && result.refused) {
       return {
-        spec: applyHint(heuristicExtract(text), typeHint),
+        spec: applyHint(safeHeuristic(text), typeHint),
         source: "heuristic",
         note: "The model declined this text - rendered with the heuristic extractor.",
         provider: null,
@@ -131,7 +131,7 @@ export async function extractSpec(text: string, typeHint?: DiagramType): Promise
   }
 
   return {
-    spec: applyHint(heuristicExtract(text), typeHint),
+    spec: applyHint(safeHeuristic(text), typeHint),
     source: "heuristic",
     note: `${providerLabel(provider)} could not produce a usable spec (${lastError || "unknown error"}) - fell back to the heuristic extractor.`,
     provider: null,
@@ -201,6 +201,25 @@ function userPrompt(text: string, typeHint: DiagramType | undefined, priorError:
   }
   parts.push("Text:\n\n" + text);
   return parts.join("\n\n");
+}
+
+/**
+ * The last resort the guide asks for: "retry once on invalid, then fallback to
+ * list".
+ *
+ * The heuristic extractor sits between the model and here and usually finds
+ * something better than a bare list, but it is still code that can throw or
+ * come back with nothing. Anything reaching this point has already failed twice,
+ * and a styled list of the sentences is always better than a 500.
+ */
+function safeHeuristic(text: string): DiagramSpec {
+  try {
+    const spec = heuristicExtract(text);
+    if (spec.nodes.length > 0) return spec;
+  } catch (error) {
+    console.error("heuristic extractor failed", error);
+  }
+  return listSpecFromText(text);
 }
 
 /**
