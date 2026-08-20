@@ -2,6 +2,25 @@
   "name": "napkin-clone",
   "version": "0.1.0",
   "private": true,
+  "description": "Paste text, get a clean editable diagram. One LLM call for structure, deterministic TypeScript for every pixel.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ndunl075/towel-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ndunl075/towel-ai/issues"
+  },
+  "homepage": "https://github.com/ndunl075/towel-ai#readme",
+  "keywords": [
+    "diagram",
+    "svg",
+    "text-to-diagram",
+    "llm",
+    "nextjs",
+    "dagre",
+    "napkin"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
