@@ -42,16 +42,49 @@ npm run dev
 
 Then open <http://localhost:3000>. Five sample texts are one click away.
 
-`ANTHROPIC_API_KEY` is **optional**. Without it the app falls back to a local
-heuristic extractor (arrows, numbered steps, `A vs B` sections) so the pipeline
-still runs end to end offline. With a key set, extraction goes through
-`claude-opus-5` with a schema-constrained response.
+Extraction has three backends and picks the first that is available:
+
+1. **Anthropic** when `ANTHROPIC_API_KEY` is set — `claude-opus-5` with a
+   schema-constrained response.
+2. **Ollama** when a local server is reachable — no key, no network, no
+   per-diagram cost. Ollama constrains decoding to the same JSON schema, so the
+   spec arrives in the right shape and nothing downstream can tell which backend
+   ran.
+3. **The built-in heuristic extractor** — arrows, numbered steps, `A vs B`
+   sections. Always available, so the pipeline runs end to end with nothing
+   installed at all.
+
+`NAPKIN_PROVIDER` pins one instead of guessing, which is what you want when both
+are configured.
+
+### Running it fully local
+
+```bash
+ollama pull llama3.1
+NAPKIN_PROVIDER=ollama OLLAMA_MODEL=llama3.1 npm run dev
+```
+
+Two things worth knowing. **Thinking is disabled by default**: reasoning models
+spend minutes on a chain of thought before answering, and this is an interactive
+path — on the same prompt and machine, a reasoning model took 9.8s with thinking
+off and had not finished after 180s with it on. Set `NAPKIN_OLLAMA_THINK=1` if
+you want it anyway.
+
+And **model size shows**. A 2B model returns schema-valid specs whose labels are
+raw sentence fragments; 7B and up is where the structure starts being worth
+looking at. The schema is enforced either way, so a weak model produces a plain
+diagram rather than a broken one.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | unset | Enables model-based extraction |
 | `NAPKIN_MODEL` | `claude-opus-5` | Model used for extraction |
 | `NAPKIN_EFFORT` | `medium` | `output_config.effort` for the extraction call |
+| `NAPKIN_PROVIDER` | `auto` | `auto`, `anthropic`, or `ollama` |
+| `OLLAMA_HOST` | `http://127.0.0.1:11434` | Where the local server lives |
+| `OLLAMA_MODEL` | `llama3.1` | Model to ask for |
+| `NAPKIN_OLLAMA_THINK` | unset | `1` to let a reasoning model think first (slow) |
+| `NAPKIN_OLLAMA_TIMEOUT` | `120000` | Milliseconds before giving up on a local call |
 | `NAPKIN_RATE_LIMIT` | `20` | Extraction requests allowed per window, per client. `0` disables |
 | `NAPKIN_RATE_WINDOW` | `60` | Rate-limit window, in seconds |
 
@@ -72,6 +105,7 @@ heuristic extractor.
 
 | Stage | Files |
 |---|---|
+| Providers | `lib/providers/anthropic.ts`, `lib/providers/ollama.ts` |
 | 0. Sectioning | `lib/sections.ts` — splits the paste into independently diagrammable parts |
 | 1. Structure extraction | `lib/extract.ts` (model), `lib/heuristic.ts` (fallback), `app/api/extract/route.ts` |
 | The spec | `lib/spec.ts` — zod schema, normalisation, repair |
@@ -171,13 +205,20 @@ That closes v0, v1 and v2.
 
 1. Model returns something that does not match the schema → one retry with the
    error fed back.
-2. Still bad, or the request errors, or the model refuses → the heuristic
-   extractor runs.
+2. Still bad, or the model refuses → the heuristic extractor. A failure that
+   re-asking cannot fix — an unreachable Ollama, a 4xx — skips the retry and
+   falls back immediately, so a server that is not running costs a fraction of a
+   second rather than two timeouts.
 3. Heuristic finds no structure → a styled list.
 
 `normalizeSpec` also repairs specs that are schema-valid but incoherent: edges
 pointing at nodes that were never declared, duplicate ids, self-loops, nodes
-referencing an undeclared group. A layout function that throws is caught and
+referencing an undeclared group, and fields containing the literal word `null`.
+That last one is what constrained decoding does to a model with nothing to say —
+the schema promises a string, so it writes `"null"` rather than omitting the
+field, and a column header renders as *null*. Small local models do it often
+enough to matter. Only `null` and `undefined` are stripped; `none` is a
+perfectly good thing to call a table row. A layout function that throws is caught and
 falls back to the list layout rather than taking the page down.
 
 ## Scripts
